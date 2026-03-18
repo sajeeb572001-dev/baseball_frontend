@@ -413,7 +413,7 @@ function switchPanel(name){
   if (name === 'tryouts')  loadTryouts();
   if (name === 'tryreg')   loadTryoutRegs();
   if (name === 'financials') loadFinancials();
-  if (name === 'calculator') loadBudgetsLocal();
+  if (name === 'budget')   loadBudgetsLocal();
 
   // Clear old poll, start new one for live tabs
   clearInterval(_pollInterval);
@@ -2053,7 +2053,33 @@ function getBudgetData() {
   };
 }
 
-// saveBudget, saveBudgetsLocal, loadBudgetsLocal — defined below using API
+function saveBudget() {
+  const data = getBudgetData();
+  if (!data.name) { showMsg('msg-budget','Please enter a budget name.','error'); return; }
+  if (_editingBudgetIdx !== null) {
+    _budgets[_editingBudgetIdx] = data;
+    _editingBudgetIdx = null;
+    document.getElementById('add-budget-txt').textContent = 'Save Budget';
+  } else {
+    _budgets.unshift(data);
+  }
+  saveBudgetsLocal();
+  renderBudgetList();
+  clearBudgetForm();
+  showMsg('msg-budget', 'Budget saved!', 'success');
+}
+
+function saveBudgetsLocal() {
+  try { localStorage.setItem('coach_budgets_' + localStorage.getItem('coach_id'), JSON.stringify(_budgets)); } catch(e){}
+}
+
+function loadBudgetsLocal() {
+  try {
+    const raw = localStorage.getItem('coach_budgets_' + localStorage.getItem('coach_id'));
+    _budgets = raw ? JSON.parse(raw) : [];
+  } catch(e) { _budgets = []; }
+  renderBudgetList();
+}
 
 function clearBudgetForm() {
   ['b-name','b-players','b-seasons','b-events-num','b-events-cost','b-events-total',
