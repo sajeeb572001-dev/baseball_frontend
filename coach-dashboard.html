@@ -2443,7 +2443,7 @@ function renderARTable() {
     const depHtml = p.deposit_amount > 0
       ? (p.deposit_paid
           ? `<span class="ar-status paid">Paid</span>`
-          : `<button class="ar-mark-btn" onclick="markDepositPaid('${p.id}')">
+          : `<button class="ar-mark-btn" onclick="markDepositPaid('${p._id}')">
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
                Mark Paid
              </button>`)
@@ -2459,7 +2459,7 @@ function renderARTable() {
         <td style="font-size:.76rem;color:var(--sub)">${esc(p.payment_deadline||'—')}</td>
         <td><span class="ar-status ${statusClass}">${esc(p.status)}</span></td>
         <td>
-          <button class="ar-mark-btn" onclick="openPaymentDetail('${p.id}')">
+          <button class="ar-mark-btn" onclick="openPaymentDetail('${p._id}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             View Plan
           </button>
@@ -2471,7 +2471,7 @@ function renderARTable() {
 async function markDepositPaid(paymentId) {
   const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
   try {
-    const p    = _playerPayments.find(x => x.id === paymentId);
+    const p    = _playerPayments.find(x => x._id === paymentId);
     if (!p) return;
     const newPaid   = (parseFloat(p.amount_paid)||0) + (parseFloat(p.deposit_amount)||0);
     const newBalance = (parseFloat(p.total_fee)||0) - newPaid;
@@ -2485,14 +2485,14 @@ async function markDepositPaid(paymentId) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
-    const idx = _playerPayments.findIndex(x => x.id === paymentId);
+    const idx = _playerPayments.findIndex(x => x._id === paymentId);
     if (idx !== -1) _playerPayments[idx] = data.payment;
     renderARTable();
   } catch(err) { alert('Error: ' + err.message); }
 }
 
 function openPaymentDetail(paymentId) {
-  const p = _playerPayments.find(x => x.id === paymentId);
+  const p = _playerPayments.find(x => x._id === paymentId);
   if (!p) return;
   document.getElementById('pd-modal-title').textContent = (p.player_name||'Player') + ' — Payment Plan';
   const fmt2 = n => '$' + (parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -2506,7 +2506,7 @@ function openPaymentDetail(paymentId) {
         <div style="display:flex;align-items:center;gap:.6rem">
           <span style="font-weight:700">${fmt2(item.amount)}</span>
           <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.72rem">
-            <input type="checkbox" class="plan-detail-check" ${item.paid?'checked':''} onchange="markMonthPaid('${p.id}',${idx},this.checked)">
+            <input type="checkbox" class="plan-detail-check" ${item.paid?'checked':''} onchange="markMonthPaid('${p._id}',${idx},this.checked)">
             ${item.paid ? 'Paid' : 'Mark Paid'}
           </label>
         </div>
@@ -2551,7 +2551,7 @@ function openPaymentDetail(paymentId) {
 }
 
 async function markMonthPaid(paymentId, monthIdx, isPaid) {
-  const p = _playerPayments.find(x => x.id === paymentId);
+  const p = _playerPayments.find(x => x._id === paymentId);
   if (!p) return;
   const plan = [...(p.payment_plan || [])];
   if (!plan[monthIdx]) return;
@@ -2569,7 +2569,7 @@ async function markMonthPaid(paymentId, monthIdx, isPaid) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
-    const idx = _playerPayments.findIndex(x => x.id === paymentId);
+    const idx = _playerPayments.findIndex(x => x._id === paymentId);
     if (idx !== -1) _playerPayments[idx] = data.payment;
     renderARTable();
     openPaymentDetail(paymentId); // refresh modal
