@@ -725,41 +725,19 @@ async function loadTeam() {
 /* ── HANDLE STRIPE REDIRECT RETURN ── */
 function handleStripeReturn() {
   const paymentStatus = params.get('payment');
-  const paymentId     = params.get('paymentId');
 
   if (paymentStatus === 'success') {
-    // Clean the URL so a refresh doesn't re-trigger this
     const cleanUrl = window.location.pathname + '?id=' + teamId;
     window.history.replaceState({}, '', cleanUrl);
 
-    // Show a success banner
     const banner = document.createElement('div');
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#16a34a;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
     banner.textContent = '✓ Deposit Payment Successful! Your spot is secured.';
     document.body.prepend(banner);
     setTimeout(() => banner.remove(), 6000);
 
-    // If we have a paymentId, update the DB record to mark deposit paid
-    if (paymentId) {
-      const today      = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-      const f          = _teamFinancials || {};
-      const totalFee   = parseFloat(f.player_fee)    || 0;
-      const depAmt     = parseFloat(f.deposit_amount) || 250;
-      const newBalance = Math.max(0, totalFee - depAmt);
-      const newStatus  = newBalance <= 0 ? 'Paid' : 'Partial';
-
-      fetch(`${API_BASE}/api/coach/player-payments/${paymentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          depositPaid:     true,
-          depositPaidDate: today,
-          amountPaid:      depAmt,
-          balance:         newBalance,
-          status:          newStatus,
-        })
-      }).catch(err => console.error('Payment record update error:', err));
-    }
+    // Note: DB payment record is updated by the Stripe webhook on the backend,
+    // not here — the webhook is the reliable source of truth for payment status.
 
   } else if (paymentStatus === 'cancelled') {
     const cleanUrl = window.location.pathname + '?id=' + teamId;
