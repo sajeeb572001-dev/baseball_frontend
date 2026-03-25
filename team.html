@@ -1181,41 +1181,33 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
   showRegistrationModal(playerName, html);
 }
 
-async function handleDepositClick(btn, _fmtAmt, paymentId, depAmt, totalFee) {
-  // Use passed arguments (buttons pass them directly), fall back to window vars
-  const pid    = paymentId || window._currentPaymentId || '';
-  const amount = depAmt    || window._currentDepAmt    || 0;
-  const player = window._currentPlayerName || '';
-
-  btn.textContent = 'Redirecting to payment…';
+async function handleDepositClick(btn) {
+  btn.textContent = 'Processing…';
   btn.disabled = true;
 
+  const paymentId = window._currentPaymentId;
+  const depAmt    = window._currentDepAmt   || 0;
+  const totalFee  = window._currentTotalFee || 0;
+  const today     = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const newPaid   = depAmt;
+  const newBalance = totalFee - depAmt;
+  const newStatus  = newBalance <= 0 ? 'Paid' : 'Partial';
+
   try {
-    const res = await fetch(`${API_BASE}/api/stripe-checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount,
-        paymentType: 'deposit',
-        playerName:  player,
-        paymentId:   pid,
-        coachId:     teamId,
-      })
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url; // ← goes to Stripe
-    } else {
-      alert('Could not start payment. Please try again.');
-      btn.textContent = 'Pay Deposit';
-      btn.disabled = false;
+    if (paymentId) {
+      const res = await fetch(`${API_BASE}/api/coach/player-payments/${paymentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          depositPaid:     true,
+          depositPaidDate: today,
+          amountPaid:      newPaid,
+          balance:         newBalance,
+          status:          newStatus,
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update');
     }
-  } catch (err) {
-    alert('Payment error: ' + err.message);
-    btn.textContent = 'Pay Deposit';
-    btn.disabled = false;
-  }
-}
     // Update button UI
     btn.textContent = '✓ Deposit Paid';
     btn.style.background = '#16a34a';
