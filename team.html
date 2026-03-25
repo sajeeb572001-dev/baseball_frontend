@@ -1037,7 +1037,7 @@ document.getElementById('reg-submit-btn').addEventListener('click', async functi
             })
           });
           const pmtData = await pmtRes.json();
-          savedPaymentId = pmtData.payment?.id || null;
+          savedPaymentId = pmtData.payment?._id || pmtData.payment?.id || null;
         } catch(e) { console.error('Payment record error:', e); }
       }
 
@@ -1243,6 +1243,14 @@ async function handleDepositClick(btn) {
   const depAmt      = window._currentDepAmt    || 0;
   const playerName  = window._currentPlayerName  || '';
   const playerEmail = window._currentPlayerEmail || '';
+
+  if (!paymentId || !depAmt || !teamId) {
+    console.error('Deposit click missing values — paymentId:', paymentId, 'depAmt:', depAmt, 'teamId:', teamId);
+    btn.textContent = 'Pay Deposit';
+    btn.disabled = false;
+    alert('Unable to start payment — missing registration data. Please refresh and try again.');
+    return;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
