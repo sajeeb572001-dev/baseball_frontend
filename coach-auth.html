@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coach Portal – Ambassadors Baseball</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0a1628;--red:#c8102e;--red2:#a50d25;--white:#ffffff;--light:#f4f6f9;--mid:#dce3ec;--text:#1a1a2e;--sub:#5a6a7a}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Open Sans',sans-serif;background:var(--light);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+.page-header{background:linear-gradient(135deg,var(--navy) 0%,#162845 100%);padding:2rem 2rem 1.6rem;position:relative;overflow:hidden}
+.page-header::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")}
+.page-header-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;position:relative}
+.page-header h1{font-family:'Oswald',sans-serif;font-size:clamp(1.4rem,3vw,2rem);font-weight:700;color:var(--white);letter-spacing:.04em;text-transform:uppercase}
+.main{flex:1;max-width:500px;margin:2.5rem auto;padding:0 1.5rem 3rem;width:100%}
+.auth-card{background:var(--white);border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden}
+.auth-card-header{background:var(--red);padding:1.4rem 1.5rem;text-align:center}
+.auth-card-header h2{font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:700;color:var(--white);letter-spacing:.1em;text-transform:uppercase}
+.auth-card-header p{color:rgba(255,255,255,.8);font-size:.8rem;margin-top:.35rem}
+.auth-tabs{display:flex;border-bottom:1px solid var(--mid)}
+.auth-tab{flex:1;padding:12px;text-align:center;font-family:'Oswald',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);cursor:pointer;background:var(--white);border:none;border-bottom:3px solid transparent;transition:all .15s}
+.auth-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.auth-tab:hover:not(.active){background:var(--light)}
+.auth-body{padding:1.6rem 1.8rem 1.8rem}
+.auth-panel{display:none}
+.auth-panel.active{display:block}
+.field-group{display:flex;flex-direction:column;gap:.42rem;margin-bottom:1.1rem}
+.field-label{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub)}
+.field-input{border:1.5px solid var(--mid);border-radius:8px;padding:11px 14px;font-size:.88rem;font-family:'Open Sans',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border-color .15s,box-shadow .15s;width:100%}
+.field-input::placeholder{color:#b0bec5}
+.field-input:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(200,16,46,.08)}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:0 1.2rem}
+.submit-btn{width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.5rem}
+.submit-btn:hover{background:#162845}
+.submit-btn:disabled{opacity:.6;cursor:not-allowed}
+.msg{padding:.75rem 1rem;border-radius:6px;font-size:.82rem;margin-bottom:1.1rem;display:none}
+.msg.error{background:#fef3f5;border:1px solid #f5c6cb;color:var(--red);display:block}
+.msg.success{background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a;display:block}
+.divider{border:none;border-top:1px solid var(--mid);margin:1.4rem 0}
+.switch-link{text-align:center;font-size:.8rem;color:var(--sub)}
+.switch-link a{color:var(--red);font-weight:600;text-decoration:none;cursor:pointer}
+.switch-link a:hover{text-decoration:underline}
+.forgot-link{font-size:.75rem;color:var(--sub);text-decoration:none;cursor:pointer;font-weight:600}
+.forgot-link:hover{color:var(--red);text-decoration:underline}
+.btn-spinner{width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:500px){.form-grid-2{grid-template-columns:1fr}.page-header-inner{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1>Coach Portal</h1>
+  </div>
+</div>
+<div class="main">
+  <div class="auth-card">
+    <div class="auth-card-header">
+      <h2>Coach Account</h2>
+      <p>Manage your team, coaches &amp; tryouts</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login"    onclick="switchTab('login')">Login</button>
+      <button class="auth-tab"        id="tab-register" onclick="switchTab('register')">Register</button>
+      <button class="auth-tab"        id="tab-forgot"   onclick="switchTab('forgot')" style="display:none">Reset</button>
+    </div>
+    <div class="auth-body">
+
+      <!-- LOGIN -->
+      <div class="auth-panel active" id="panel-login">
+        <div class="msg" id="login-msg"></div>
+        <div class="field-group">
+          <label class="field-label">Email Address</label>
+          <input class="field-input" type="email" id="login-email" placeholder="coach@email.com">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Password</label>
+          <input class="field-input" type="password" id="login-password" placeholder="••••••••">
+        </div>
+        <div style="text-align:right;margin-top:-.5rem;margin-bottom:.9rem">
+          <a class="forgot-link" onclick="switchTab('forgot')">Forgot password?</a>
+        </div>
+        <button class="submit-btn" id="login-btn" onclick="handleLogin()">
+          <span id="login-btn-text">Login to Dashboard</span>
+        </button>
+        <hr class="divider">
+        <p class="switch-link">Don't have an account? <a onclick="switchTab('register')">Register here</a></p>
+      </div>
+
+      <!-- REGISTER -->
+      <div class="auth-panel" id="panel-register">
+        <div class="msg" id="reg-msg"></div>
+        <div class="form-grid-2">
+          <div class="field-group">
+            <label class="field-label">First Name</label>
+            <input class="field-input" type="text" id="reg-firstname" placeholder="John">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Last Name</label>
+            <input class="field-input" type="text" id="reg-lastname" placeholder="Smith">
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Email Address</label>
+          <input class="field-input" type="email" id="reg-email" placeholder="coach@email.com">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Phone Number</label>
+          <input class="field-input" type="tel" id="reg-phone" placeholder="(615) 000-0000">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Team Name</label>
+          <input class="field-input" type="text" id="reg-teamname" placeholder="e.g. Ambassadors 17U National">
+        </div>
+        <div class="field-group">
+          <label class="field-label">State</label>
+          <input class="field-input" type="text" id="reg-state" placeholder="e.g. TN" maxlength="2">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Age Group</label>
+          <input class="field-input" type="text" id="reg-agegroup" placeholder="e.g. 17U">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Password</label>
+          <input class="field-input" type="password" id="reg-password" placeholder="Min 8 characters">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Confirm Password</label>
+          <input class="field-input" type="password" id="reg-confirm" placeholder="Repeat password">
+        </div>
+        <button class="submit-btn" id="reg-btn" onclick="handleRegister()">
+          <span id="reg-btn-text">Create Account</span>
+        </button>
+        <hr class="divider">
+        <p class="switch-link">Already have an account? <a onclick="switchTab('login')">Login here</a></p>
+      </div>
+
+      <!-- FORGOT PASSWORD – Step 1: Enter email -->
+      <div class="auth-panel" id="panel-forgot">
+        <div class="msg" id="forgot-msg"></div>
+        <div id="forgot-step1">
+          <p style="font-size:.82rem;color:var(--sub);margin-bottom:1.1rem;line-height:1.5">Enter your registered email and we'll send you a 6-digit verification code.</p>
+          <div class="field-group">
+            <label class="field-label">Email Address</label>
+            <input class="field-input" type="email" id="forgot-email" placeholder="coach@email.com">
+          </div>
+          <button class="submit-btn" id="forgot-btn" onclick="handleForgotPassword()">
+            <span id="forgot-btn-text">Send OTP Code</span>
+          </button>
+        </div>
+
+        <!-- Step 2: Enter OTP + new password (hidden until step 1 succeeds) -->
+        <div id="forgot-step2" style="display:none">
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:.75rem 1rem;font-size:.82rem;color:#15803d;margin-bottom:1.1rem" id="forgot-sent-notice"></div>
+          <div class="field-group">
+            <label class="field-label">6-Digit Code</label>
+            <input class="field-input" type="text" id="forgot-otp" placeholder="••••••" maxlength="6" inputmode="numeric" style="letter-spacing:.25em;font-size:1.2rem;text-align:center">
+          </div>
+          <div class="field-group">
+            <label class="field-label">New Password</label>
+            <input class="field-input" type="password" id="forgot-newpw" placeholder="Min 8 characters" oninput="updateForgotStrength()">
+            <div style="background:var(--mid);border-radius:2px;height:4px;margin-top:.4rem;overflow:hidden"><div id="forgot-pw-bar" style="height:4px;border-radius:2px;width:0;transition:width .3s,background .3s"></div></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Confirm Password</label>
+            <input class="field-input" type="password" id="forgot-confirmpw" placeholder="Repeat password">
+          </div>
+          <button class="submit-btn" id="forgot-verify-btn" onclick="handleVerifyOtp()">
+            <span id="forgot-verify-btn-text">Update Password</span>
+          </button>
+          <div style="text-align:center;margin-top:.9rem">
+            <a style="font-size:.77rem;color:var(--sub);cursor:pointer;font-weight:600" onclick="resendOtp()" id="resend-link">Didn't get a code? Resend</a>
+          </div>
+        </div>
+
+        <hr class="divider">
+        <p class="switch-link">Remember your password? <a onclick="switchTab('login')">Back to Login</a></p>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+'use strict';
+const API_BASE = 'https://backend-baseball-inky.vercel.app'; // ✅ Updated to new MongoDB backend
+if (localStorage.getItem('coach_token')) window.location.href = 'coach-dashboard.html';
+
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+  // Show/hide the reset tab button only when on that panel
+  const forgotTab = document.getElementById('tab-forgot');
+  forgotTab.style.display = tab === 'forgot' ? '' : 'none';
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+async function handleForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) { showMsg('forgot-msg','Please enter your email address.','error'); return; }
+  setLoading('forgot-btn','forgot-btn-text',true);
+  try {
+    const res  = await fetch(`${API_BASE}/api/coach/forgot-password`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message||'Request failed');
+    document.getElementById('forgot-step1').style.display = 'none';
+    document.getElementById('forgot-step2').style.display = 'block';
+    document.getElementById('forgot-msg').style.display   = 'none';
+    const notice = document.getElementById('forgot-sent-notice');
+    notice.textContent = 'A 6-digit code was sent to ' + email.replace(/(.{2}).+(@.+)/,'$1***$2') + '. Check your inbox (and spam folder).';
+    if (data.devOtp) notice.textContent += ` [Dev OTP: ${data.devOtp}]`;
+    document.getElementById('forgot-email').dataset.email = email;
+  } catch(err){ showMsg('forgot-msg',err.message,'error'); }
+  finally{ setLoading('forgot-btn','forgot-btn-text',false,'Send OTP Code'); }
+}
+
+function updateForgotStrength() {
+  const v = document.getElementById('forgot-newpw').value;
+  const bar = document.getElementById('forgot-pw-bar');
+  let s = 0;
+  if (v.length >= 8) s++;
+  if (/[A-Z]/.test(v)) s++;
+  if (/[0-9]/.test(v)) s++;
+  if (/[^A-Za-z0-9]/.test(v)) s++;
+  bar.style.width = (s*25)+'%';
+  bar.style.background = ['','#c8102e','#f59e0b','#3b82f6','#16a34a'][s]||'';
+}
+
+async function handleVerifyOtp() {
+  const email    = document.getElementById('forgot-email').dataset.email;
+  const otp      = document.getElementById('forgot-otp').value.trim();
+  const password = document.getElementById('forgot-newpw').value;
+  const confirm  = document.getElementById('forgot-confirmpw').value;
+  if (!otp||otp.length!==6){ showMsg('forgot-msg','Please enter the 6-digit code.','error'); document.getElementById('forgot-msg').style.display='block'; return; }
+  if (!password||password.length<8){ showMsg('forgot-msg','Password must be at least 8 characters.','error'); document.getElementById('forgot-msg').style.display='block'; return; }
+  if (password!==confirm){ showMsg('forgot-msg','Passwords do not match.','error'); document.getElementById('forgot-msg').style.display='block'; return; }
+  setLoading('forgot-verify-btn','forgot-verify-btn-text',true);
+  try {
+    const res  = await fetch(`${API_BASE}/api/coach/verify-otp-reset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,otp,password})});
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message||'Verification failed');
+    showMsg('forgot-msg','✅ Password updated! Redirecting to login…','success');
+    document.getElementById('forgot-msg').style.display='block';
+    document.getElementById('forgot-step2').style.display='none';
+    setTimeout(()=>switchTab('login'),2000);
+  } catch(err){ showMsg('forgot-msg',err.message,'error'); document.getElementById('forgot-msg').style.display='block'; }
+  finally{ setLoading('forgot-verify-btn','forgot-verify-btn-text',false,'Update Password'); }
+}
+
+async function resendOtp() {
+  const email = document.getElementById('forgot-email').dataset.email;
+  if (!email) return;
+  document.getElementById('resend-link').textContent='Sending…';
+  try {
+    const res  = await fetch(`${API_BASE}/api/coach/forgot-password`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    const data = await res.json();
+    const notice = document.getElementById('forgot-sent-notice');
+    notice.textContent = 'A new code was sent!'+(data.devOtp?` [Dev OTP: ${data.devOtp}]`:'');
+  } catch(e){}
+  finally{ document.getElementById('resend-link').textContent="Didn't get a code? Resend"; }
+}
+function showMsg(id,text,type){ const el=document.getElementById(id); el.textContent=text; el.className='msg '+type; }
+function setLoading(btnId,textId,loading,label){
+  document.getElementById(btnId).disabled=loading;
+  document.getElementById(textId).innerHTML=loading?'<span class="btn-spinner"></span>':label;
+}
+
+async function handleLogin() {
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  if (!email||!password){ showMsg('login-msg','Please enter your email and password.','error'); return; }
+  setLoading('login-btn','login-btn-text',true);
+  try {
+    const res=await fetch(`${API_BASE}/api/coach/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.message||'Login failed');
+    localStorage.setItem('coach_token',data.token);
+    localStorage.setItem('coach_id',data.coach._id);
+    showMsg('login-msg','Login successful! Redirecting…','success');
+    setTimeout(()=>{ window.location.href='coach-dashboard.html'; },700);
+  } catch(err){ showMsg('login-msg',err.message,'error'); }
+  finally{ setLoading('login-btn','login-btn-text',false,'Login to Dashboard'); }
+}
+
+async function handleRegister() {
+  const firstName=document.getElementById('reg-firstname').value.trim();
+  const lastName=document.getElementById('reg-lastname').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const phone=document.getElementById('reg-phone').value.trim();
+  const teamName=document.getElementById('reg-teamname').value.trim();
+  const state=document.getElementById('reg-state').value.trim().toUpperCase();
+  const ageGroup=document.getElementById('reg-agegroup').value.trim();
+  const password=document.getElementById('reg-password').value;
+  const confirm=document.getElementById('reg-confirm').value;
+  if (!firstName||!lastName||!email||!phone||!teamName||!password){ showMsg('reg-msg','Please fill in all fields.','error'); return; }
+  if (password.length<8){ showMsg('reg-msg','Password must be at least 8 characters.','error'); return; }
+  if (password!==confirm){ showMsg('reg-msg','Passwords do not match.','error'); return; }
+  setLoading('reg-btn','reg-btn-text',true);
+  try {
+    const res=await fetch(`${API_BASE}/api/coach/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({firstName,lastName,email,phone,teamName,state,ageGroup,password})});
+    const data=await res.json();
+    if (!res.ok) throw new Error(data.message||'Registration failed');
+    showMsg('reg-msg','Account created! Please login.','success');
+    setTimeout(()=>switchTab('login'),1500);
+  } catch(err){ showMsg('reg-msg',err.message,'error'); }
+  finally{ setLoading('reg-btn','reg-btn-text',false,'Create Account'); }
+}
+
+document.addEventListener('keydown',e=>{ if(e.key!=='Enter') return; const a=document.querySelector('.auth-panel.active').id; if(a==='panel-login') handleLogin(); else handleRegister(); });
+</script>
+</body>
+</html>
