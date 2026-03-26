@@ -933,7 +933,7 @@ async function loadTryouts(id) {
           </svg>
           ${esc([t.city, t.state].filter(Boolean).join(', '))}
         </div>` : ''}
-        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}', '${esc(t.fee||'Free')}')">Register for Tryout</button>
+        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}', '${esc(t.fee||'Free')}', '${esc(t.time||'')}', '${esc(t.location||'')}')">Register for Tryout</button>
       </div>`).join('');
   } catch (err) {
     grid.innerHTML = `<div class="no-tryouts">No upcoming tryouts scheduled. Check back soon!</div>`;
@@ -1283,9 +1283,11 @@ const trOverlay = document.getElementById('trOverlay');
 const _originalModalBody = document.getElementById('tr-modal-body').innerHTML;
 const _originalModalFoot = document.getElementById('tr-modal-foot').innerHTML;
 
-function openTryoutModal(dateLabel, tryoutFee) {
-  window._currentTryoutFee  = tryoutFee || 'Free';
-  window._currentTryoutDate = dateLabel || '';
+function openTryoutModal(dateLabel, tryoutFee, tryoutTime, tryoutLocation) {
+  window._currentTryoutFee      = tryoutFee      || 'Free';
+  window._currentTryoutDate     = dateLabel       || '';
+  window._currentTryoutTime     = tryoutTime      || '';
+  window._currentTryoutLocation = tryoutLocation  || '';
   const isFree = !tryoutFee || tryoutFee === 'Free';
   document.getElementById('tr-modal-sub').textContent = dateLabel || 'Complete the form below to reserve your spot';
   // Show fee notice in modal header if paid
@@ -1376,7 +1378,9 @@ async function handleTryoutSubmit() {
         hw:         document.getElementById('tr-hw').value.trim(),
         pos1:       document.getElementById('tr-pos1').value,
         pos2:       document.getElementById('tr-pos2').value,
-        tryoutDate: document.getElementById('tr-modal-sub').textContent
+        tryoutDate:     document.getElementById('tr-modal-sub').textContent,
+        tryoutTime:     window._currentTryoutTime     || '',
+        tryoutLocation: window._currentTryoutLocation || ''
       })
     });
     const data = await res.json();
