@@ -1311,10 +1311,47 @@ function openTryoutModal(dateLabel, tryoutFee, tryoutTime, tryoutLocation) {
   
   // Initialize Flatpickr on date field AFTER modal opens
   setTimeout(() => {
+    // Destroy any existing instance first to avoid duplicate calendars on re-open
+    const existing = document.getElementById('tr-dob')._flatpickr;
+    if (existing) existing.destroy();
+
     flatpickr('#tr-dob', {
       dateFormat: 'd/m/Y',
       allowInput: false,
-      disableMobile: true
+      disableMobile: true,
+      maxDate: 'today',
+      // Default to a reasonable birth year (13 years ago)
+      defaultDate: (() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 13);
+        return d;
+      })(),
+      // Replace the plain year number-input with a <select> dropdown
+      onReady(_sel, _str, fp) {
+        const yearEl = fp.currentYearElement;
+        if (!yearEl) return;
+        const sel = document.createElement('select');
+        sel.style.cssText = 'background:transparent;border:none;color:#fff;font-size:.9rem;font-weight:700;cursor:pointer;padding:0 4px;outline:none;max-width:64px;';
+        const curYear = new Date().getFullYear();
+        for (let y = curYear; y >= 1950; y--) {
+          const o = document.createElement('option');
+          o.value = y;
+          o.textContent = y;
+          if (y === fp.currentYear) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener('change', () => fp.changeYear(+sel.value));
+        yearEl.parentNode.replaceChild(sel, yearEl);
+      },
+      // Keep the select in sync when the user navigates months
+      onMonthChange(_sel, _str, fp) {
+        const s = fp.calendarContainer && fp.calendarContainer.querySelector('select');
+        if (s) s.value = fp.currentYear;
+      },
+      onYearChange(_sel, _str, fp) {
+        const s = fp.calendarContainer && fp.calendarContainer.querySelector('select');
+        if (s) s.value = fp.currentYear;
+      }
     });
   }, 50);
 }
