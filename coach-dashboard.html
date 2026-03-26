@@ -856,11 +856,11 @@ function renderDashboard(coach){
               <thead>
                 <tr>
                   <th>Player Name</th><th>Contact Name</th><th>Email</th><th>Cell</th>
-                  <th>Position(s)</th><th>Age</th><th>HT/WT</th><th>Completed By</th><th>Address</th><th>Fee</th><th>Payment</th><th>Actions</th>
+                  <th>Position(s)</th><th>Age</th><th>HT/WT</th><th>Completed By</th><th>Address</th><th>Fee</th><th>Payment</th>
                 </tr>
               </thead>
               <tbody id="tryreg-body">
-                <tr><td colspan="12"><div class="no-schedule-dash">Select a tryout above.</div></td></tr>
+                <tr><td colspan="11"><div class="no-schedule-dash">Select a tryout above.</div></td></tr>
               </tbody>
             </table>
           </div>
@@ -1651,10 +1651,6 @@ function renderDashRoster(players) {
       <td>${p.email ? `<a href="mailto:${esc(p.email)}" style="color:var(--navy);text-decoration:none;font-weight:500">${esc(p.email)}</a>` : '—'}</td>
       <td>${p.cell ? `<a href="tel:+1${p.cell.replace(/\D/g,'')}" style="color:var(--navy);text-decoration:none;font-weight:500">${esc(p.cell)}</a>` : '—'}</td>
       <td style="white-space:nowrap">
-        <button class="roster-edit-btn" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="viewPlayerDetails('${esc(p._id)}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          View
-        </button>
         <button class="roster-edit-btn" onclick="openEditPlayer('${esc(p._id)}')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Edit
@@ -1689,152 +1685,6 @@ function closeEditModal() {
   document.body.style.overflow = '';
   editingPlayerId = null;
 }
-
-// ── VIEW PLAYER DETAILS ──────────────────────────────────────────
-async function viewPlayerDetails(playerId) {
-  const overlay = document.getElementById('view-player-overlay');
-  const body    = document.getElementById('view-player-body');
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--sub)">Loading…</div>';
-
-  const player = dashRosterData.find(p => p._id === playerId);
-  if (!player) {
-    body.innerHTML = '<div style="padding:1.5rem;color:var(--red)">Player not found.</div>';
-    return;
-  }
-
-  // Fetch payment info
-  let paymentInfo = null;
-  try {
-    const res  = await fetch(`${API_BASE}/api/coach/player-payments`, { headers: authH() });
-    const data = await res.json();
-    const payments = data.payments || [];
-    paymentInfo = payments.find(pm => pm.player_id && pm.player_id.toString() === playerId) || null;
-  } catch(_) {}
-
-  const fmt = n => '$' + (Number(n)||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  const totalFee    = paymentInfo ? paymentInfo.total_fee    : null;
-  const amountPaid  = paymentInfo ? paymentInfo.amount_paid  : null;
-  const balance     = paymentInfo ? paymentInfo.balance      : null;
-  const status      = paymentInfo ? paymentInfo.status       : null;
-
-  const statusColor = status === 'Paid' ? '#16a34a' : status === 'Pending' ? '#c8102e' : '#0369a1';
-  const statusBg    = status === 'Paid' ? '#dcfce7' : status === 'Pending' ? '#fef2f2' : '#e0f2fe';
-
-  body.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:1.2rem">
-
-      <!-- Info Section -->
-      <div>
-        <div style="font-family:'Oswald',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin-bottom:.7rem">Player Info</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.2rem">
-          ${infoRow('Player Name', player.name)}
-          ${infoRow('Cell', player.cell ? `<a href="tel:+1${(player.cell||'').replace(/\D/g,'')}" style="color:var(--navy);text-decoration:none">${esc(player.cell)}</a>` : '—', true)}
-          ${infoRow('Email', player.email ? `<a href="mailto:${esc(player.email)}" style="color:var(--navy);text-decoration:none">${esc(player.email)}</a>` : '—', true)}
-          ${infoRow('Position', player.position)}
-          ${infoRow('Jersey #', player.jersey)}
-          ${infoRow('Grad Year', player.gradYear)}
-          ${infoRow('HT/WT', player.hw)}
-          ${infoRow('City', player.city)}
-          ${infoRow('State', player.state)}
-        </div>
-      </div>
-
-      <!-- Payment Section -->
-      <div>
-        <div style="font-family:'Oswald',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin-bottom:.7rem">Payment Info</div>
-        ${paymentInfo ? `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.2rem">
-          ${infoRow('Total Fee', fmt(totalFee))}
-          ${infoRow('Amount Paid', `<span style="color:#16a34a;font-weight:700">${fmt(amountPaid)}</span>`, true)}
-          ${infoRow('Remaining Balance', `<span style="color:${balance > 0 ? '#c8102e' : '#16a34a'};font-weight:700">${fmt(balance)}</span>`, true)}
-          ${infoRow('Status', `<span style="background:${statusBg};color:${statusColor};font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em">${esc(status)}</span>`, true)}
-          ${paymentInfo.registered_date ? infoRow('Registered', paymentInfo.registered_date) : ''}
-          ${paymentInfo.payment_deadline ? infoRow('Deadline', paymentInfo.payment_deadline) : ''}
-        </div>` : `
-        <div style="background:var(--light);border:1.5px dashed var(--mid);border-radius:6px;padding:1rem;font-size:.82rem;color:var(--sub);text-align:center">
-          No payment record found for this player.
-        </div>`}
-      </div>
-    </div>`;
-}
-
-function infoRow(label, value, rawHtml = false) {
-  const displayVal = rawHtml ? (value || '—') : esc(value || '—');
-  return `<div>
-    <div style="font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin-bottom:2px">${label}</div>
-    <div style="font-size:.88rem;color:var(--text)">${displayVal}</div>
-  </div>`;
-}
-
-function closeViewPlayerModal() {
-  document.getElementById('view-player-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-// ── VIEW TRYOUT REGISTRATION DETAILS ─────────────────────────────
-function viewTryregDetails(regId) {
-  const overlay = document.getElementById('view-tryreg-overlay');
-  const body    = document.getElementById('view-tryreg-body');
-  overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
-
-  const r = _allTryoutRegs.find(x => x._id === regId);
-  if (!r) {
-    body.innerHTML = '<div style="padding:1.5rem;color:var(--red)">Registration not found.</div>';
-    return;
-  }
-
-  const isFree   = !r.tryout_fee || r.tryout_fee === 'Free';
-  const status   = r.payment_status || (isFree ? 'Free' : 'Pending');
-  const feeAmt   = r.tryout_fee_amount || 0;
-  const amtPaid  = (status === 'Paid') ? feeAmt : 0;
-  const remaining = isFree ? 0 : feeAmt - amtPaid;
-  const fmt      = n => '$' + (Number(n)||0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-
-  const statusColor = status === 'Paid' ? '#16a34a' : status === 'Pending' ? '#c8102e' : '#0369a1';
-  const statusBg    = status === 'Paid' ? '#dcfce7' : status === 'Pending' ? '#fef2f2' : '#e0f2fe';
-
-  body.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:1.2rem">
-
-      <!-- Player Info -->
-      <div>
-        <div style="font-family:'Oswald',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin-bottom:.7rem">Player Info</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.2rem">
-          ${infoRow('Player Name', r.player_name)}
-          ${infoRow('Contact Name', r.name)}
-          ${infoRow('Cell', r.cell ? `<a href="tel:+1${(r.cell||'').replace(/\D/g,'')}" style="color:var(--navy);text-decoration:none">${esc(r.cell)}</a>` : '—', true)}
-          ${infoRow('Email', r.email ? `<a href="mailto:${esc(r.email)}" style="color:var(--navy);text-decoration:none">${esc(r.email)}</a>` : '—', true)}
-          ${infoRow('Age', r.age)}
-          ${infoRow('HT/WT', r.hw)}
-          ${infoRow('Position(s)', [r.pos1, r.pos2].filter(Boolean).join(', '))}
-          ${infoRow('Tryout Date', r.tryout_date)}
-          ${infoRow('Address', [r.address, r.city, r.state, r.zip].filter(Boolean).join(', '))}
-          ${infoRow('Completed By', r.completed_by)}
-        </div>
-      </div>
-
-      <!-- Payment Info -->
-      <div>
-        <div style="font-family:'Oswald',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin-bottom:.7rem">Payment Info</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem 1.2rem">
-          ${infoRow('Tryout Fee', isFree ? 'Free' : fmt(feeAmt))}
-          ${infoRow('Amount Paid', `<span style="color:#16a34a;font-weight:700">${isFree ? 'N/A' : fmt(amtPaid)}</span>`, true)}
-          ${infoRow('Remaining Balance', `<span style="color:${remaining > 0 ? '#c8102e' : '#16a34a'};font-weight:700">${isFree ? 'N/A' : fmt(remaining)}</span>`, true)}
-          ${infoRow('Status', `<span style="background:${statusBg};color:${statusColor};font-size:.68rem;font-weight:700;padding:2px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em">${esc(status)}</span>`, true)}
-          ${r.payment_date ? infoRow('Payment Date', r.payment_date) : ''}
-        </div>
-      </div>
-    </div>`;
-}
-
-function closeViewTryregModal() {
-  document.getElementById('view-tryreg-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
 
 async function saveEditPlayer() {
   if (!editingPlayerId) return;
@@ -1879,7 +1729,7 @@ async function deletePlayer(id) {
   } catch(err) { alert('Error: ' + err.message); }
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeEditModal(); closeEditGameModal(); closeEditTryoutModal(); closeBudgetView(); closePaymentDetail(); closeViewPlayerModal(); closeViewTryregModal(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeEditModal(); closeEditGameModal(); closeEditTryoutModal(); closeBudgetView(); closePaymentDetail(); } });
 
 /* Prevent arrow keys from changing number input values */
 document.addEventListener('keydown', (e) => {
@@ -2070,7 +1920,7 @@ function showTryregForTryout(date, location) {
   tableWrap.style.display = 'block';
 
   if (!regs.length) {
-    tbody.innerHTML = '<tr><td colspan="12"><div class="no-schedule-dash">No registrations for this tryout yet.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11"><div class="no-schedule-dash">No registrations for this tryout yet.</div></td></tr>';
     return;
   }
   tbody.innerHTML = regs.map(r => {
@@ -2098,7 +1948,6 @@ function showTryregForTryout(date, location) {
       '<td>' + esc([r.address, r.city, r.state, r.zip].filter(Boolean).join(', ')||'—') + '</td>' +
       '<td>' + esc(r.tryout_fee||'Free') + '</td>' +
       '<td>' + statusBadge + markPaidBtn + '</td>' +
-      '<td style="white-space:nowrap"><button class="roster-edit-btn" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="viewTryregDetails(\'' + r._id + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View</button></td>' +
     '</tr>';
   }).join('');
 
@@ -3268,42 +3117,6 @@ async function loadBudgetsLocal() {
 
 loadDashboard();
 </script>
-
-<!-- VIEW PLAYER DETAILS MODAL -->
-<div class="edit-overlay" id="view-player-overlay">
-  <div class="edit-modal" style="max-width:540px">
-    <div class="edit-modal-head" style="background:var(--navy)">
-      <h3>Player Details</h3>
-      <button class="edit-modal-close" onclick="closeViewPlayerModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="edit-modal-body" id="view-player-body" style="max-height:78vh;overflow-y:auto">
-      <div style="text-align:center;padding:2rem;color:var(--sub)">Loading…</div>
-    </div>
-    <div class="edit-modal-foot">
-      <button class="edit-cancel-btn" onclick="closeViewPlayerModal()">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- VIEW TRYOUT REGISTRATION MODAL -->
-<div class="edit-overlay" id="view-tryreg-overlay">
-  <div class="edit-modal" style="max-width:540px">
-    <div class="edit-modal-head" style="background:var(--navy)">
-      <h3>Tryout Registration Details</h3>
-      <button class="edit-modal-close" onclick="closeViewTryregModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="edit-modal-body" id="view-tryreg-body" style="max-height:78vh;overflow-y:auto">
-      <div style="text-align:center;padding:2rem;color:var(--sub)">Loading…</div>
-    </div>
-    <div class="edit-modal-foot">
-      <button class="edit-cancel-btn" onclick="closeViewTryregModal()">Close</button>
-    </div>
-  </div>
-</div>
 
 <!-- EDIT PLAYER MODAL -->
 <div class="edit-overlay" id="edit-overlay">
