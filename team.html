@@ -470,6 +470,7 @@ th.sort-desc .sort-icon .up   { opacity: .3; }
       <div>
         <div class="tr-modal-title">Register for Tryout</div>
         <div class="tr-modal-sub" id="tr-modal-sub">Complete the form below to reserve your spot</div>
+        <div id="tr-fee-notice" style="display:none;margin-top:6px;background:rgba(255,255,255,.18);border-radius:5px;padding:5px 10px;font-size:.72rem;color:#fff;font-weight:600;letter-spacing:.04em"></div>
       </div>
       <button class="tr-modal-close" id="trModalClose" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -749,6 +750,26 @@ function handleStripeReturn() {
     document.body.prepend(banner);
     setTimeout(() => banner.remove(), 5000);
   }
+
+  // ── TRYOUT PAYMENT RETURN ──
+  const tryoutPaymentStatus = params.get('tryout_payment');
+  if (tryoutPaymentStatus === 'success') {
+    const cleanUrl = window.location.pathname + '?id=' + teamId;
+    window.history.replaceState({}, '', cleanUrl);
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#16a34a;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+    banner.textContent = '✓ Tryout Fee Paid! Your registration is confirmed.';
+    document.body.prepend(banner);
+    setTimeout(() => banner.remove(), 6000);
+  } else if (tryoutPaymentStatus === 'cancelled') {
+    const cleanUrl = window.location.pathname + '?id=' + teamId;
+    window.history.replaceState({}, '', cleanUrl);
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#c8102e;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+    banner.textContent = 'Tryout payment cancelled — your registration is saved but payment is pending.';
+    document.body.prepend(banner);
+    setTimeout(() => banner.remove(), 6000);
+  }
 }
 
 /* ── RENDER PAGE ── */
@@ -912,7 +933,7 @@ async function loadTryouts(id) {
           </svg>
           ${esc([t.city, t.state].filter(Boolean).join(', '))}
         </div>` : ''}
-        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}')">Register for Tryout</button>
+        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}', '${esc(t.fee||'Free')}')">Register for Tryout</button>
       </div>`).join('');
   } catch (err) {
     grid.innerHTML = `<div class="no-tryouts">No upcoming tryouts scheduled. Check back soon!</div>`;
@@ -1262,8 +1283,21 @@ const trOverlay = document.getElementById('trOverlay');
 const _originalModalBody = document.getElementById('tr-modal-body').innerHTML;
 const _originalModalFoot = document.getElementById('tr-modal-foot').innerHTML;
 
-function openTryoutModal(dateLabel) {
+function openTryoutModal(dateLabel, tryoutFee) {
+  window._currentTryoutFee  = tryoutFee || 'Free';
+  window._currentTryoutDate = dateLabel || '';
+  const isFree = !tryoutFee || tryoutFee === 'Free';
   document.getElementById('tr-modal-sub').textContent = dateLabel || 'Complete the form below to reserve your spot';
+  // Show fee notice in modal header if paid
+  const feeNotice = document.getElementById('tr-fee-notice');
+  if (feeNotice) {
+    if (!isFree) {
+      feeNotice.textContent = 'Tryout Fee: ' + tryoutFee + ' — Payment required via card after registration';
+      feeNotice.style.display = 'block';
+    } else {
+      feeNotice.style.display = 'none';
+    }
+  }
   // Fully reset body and footer back to original form
   document.getElementById('tr-modal-body').innerHTML = _originalModalBody;
   document.getElementById('tr-modal-foot').innerHTML = _originalModalFoot;
@@ -1318,9 +1352,13 @@ async function handleTryoutSubmit() {
   const btn = document.getElementById('tr-submit-btn');
   btn.disabled = true;
   btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle"></span>';
+
+  const email      = document.getElementById('tr-email').value.trim();
+  const tryoutFee  = window._currentTryoutFee || 'Free';
+  const isFree     = tryoutFee === 'Free' || tryoutFee === '';
+
   try {
-    const email = document.getElementById('tr-email').value.trim();
-    await fetch(`${API_BASE}/api/teams/${teamId}/tryout-registrations`, {
+    const res = await fetch(`${API_BASE}/api/teams/${teamId}/tryout-registrations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1341,27 +1379,58 @@ async function handleTryoutSubmit() {
         tryoutDate: document.getElementById('tr-modal-sub').textContent
       })
     });
-    document.getElementById('tr-modal-body').innerHTML = `
-      <div class="tr-success">
-        Registration submitted!<br>
-        We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.<br>
-        A confirmation will be sent to ${esc(email || 'your email')}.
-      </div>`;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Registration failed');
+
+    if (!isFree && data.regId) {
+      // Paid tryout — redirect to Stripe
+      const feeNum = parseFloat(tryoutFee.replace(/[^0-9.]/g, '')) || data.tryoutFeeAmt || 0;
+      document.getElementById('tr-modal-body').innerHTML = `
+        <div class="tr-success">
+          Registration received for <strong>${esc(playerName)}</strong>!<br><br>
+          Redirecting to payment for <strong>${esc(tryoutFee)}</strong> tryout fee…
+          <div style="margin-top:1rem">
+            <span style="display:inline-block;width:20px;height:20px;border:2.5px solid rgba(10,22,40,.3);border-top-color:var(--navy);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle"></span>
+          </div>
+        </div>`;
+      document.getElementById('tr-modal-foot').style.display = 'none';
+
+      const stripeRes = await fetch(`${API_BASE}/api/stripe/create-tryout-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          regId:       data.regId,
+          feeAmount:   feeNum,
+          playerName,
+          playerEmail: email,
+          teamId,
+        })
+      });
+      const stripeData = await stripeRes.json();
+      if (!stripeRes.ok) throw new Error(stripeData.message || 'Stripe error');
+      window.location.href = stripeData.url;
+
+    } else {
+      // Free tryout — show success
+      document.getElementById('tr-modal-body').innerHTML = `
+        <div class="tr-success">
+          Registration submitted!<br>
+          We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.<br>
+          A confirmation will be sent to ${esc(email || 'your email')}.
+        </div>`;
+      const foot = document.getElementById('tr-modal-foot');
+      foot.style.display = 'block';
+      foot.innerHTML = `
+        <button class="tr-submit-btn" onclick="closeTryoutModal()" style="background:var(--navy)">
+          Close
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>`;
+    }
   } catch (err) {
     console.error('[tryout-reg]', err);
-    document.getElementById('tr-modal-body').innerHTML = `
-      <div class="tr-success">
-        Registration submitted!<br>
-        We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.
-      </div>`;
-  } finally {
-    const foot = document.getElementById('tr-modal-foot');
-    foot.style.display = 'block';
-    foot.innerHTML = `
-      <button class="tr-submit-btn" onclick="closeTryoutModal()" style="background:var(--navy)">
-        Return
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>`;
+    btn.disabled = false;
+    btn.textContent = 'Submit';
+    alert('Error: ' + err.message);
   }
 }
 
