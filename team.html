@@ -1314,7 +1314,33 @@ function openTryoutModal(dateLabel, tryoutFee, tryoutTime, tryoutLocation) {
     flatpickr('#tr-dob', {
       dateFormat: 'd/m/Y',
       allowInput: false,
-      disableMobile: true
+      disableMobile: true,
+      maxDate: 'today',
+      defaultDate: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 13); return d; })(),
+      onReady(sel, str, fp) {
+        // Replace the plain year number-input with a <select> for easy year picking
+        const yearEl = fp.currentYearElement;
+        const yearSel = document.createElement('select');
+        yearSel.className = 'fp-year-select';
+        yearSel.style.cssText = 'background:transparent;border:none;color:#fff;font-size:.9rem;font-weight:700;cursor:pointer;padding:0 2px;outline:none;';
+        const curYear = new Date().getFullYear();
+        for (let y = curYear; y >= 1950; y--) {
+          const o = document.createElement('option');
+          o.value = y; o.text = y;
+          if (y === fp.currentYear) o.selected = true;
+          yearSel.appendChild(o);
+        }
+        yearSel.addEventListener('change', () => fp.changeYear(+yearSel.value));
+        yearEl.parentNode.replaceChild(yearSel, yearEl);
+      },
+      onMonthChange(sel, str, fp) {
+        const s = fp.calendarContainer && fp.calendarContainer.querySelector('.fp-year-select');
+        if (s) s.value = fp.currentYear;
+      },
+      onYearChange(sel, str, fp) {
+        const s = fp.calendarContainer && fp.calendarContainer.querySelector('.fp-year-select');
+        if (s) s.value = fp.currentYear;
+      }
     });
   }, 50);
 }
