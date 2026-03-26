@@ -2025,12 +2025,8 @@ async function loadTryoutRegs() {
 
     cardsWrap.innerHTML = _allDashTryouts.map(t => {
       const regsForTryout = _allTryoutRegs.filter(r => {
-        // New records: match by date + time + location (composite key)
-        if (r.tryout_time || r.tryout_location) {
-          return r.tryout_date === t.date && r.tryout_time === (t.time||'') && r.tryout_location === (t.location||'');
-        }
-        // Old records: fall back to date only
-        return r.tryout_date === t.date;
+        // Match strictly by date + time + location (composite unique key)
+        return r.tryout_date === t.date && r.tryout_time === (t.time||'') && r.tryout_location === (t.location||'');
       });
       const count    = regsForTryout.length;
       const isFree   = !t.fee || t.fee === 'Free';
@@ -2073,12 +2069,8 @@ function showTryregForTryout(date, time, location) {
   const heading   = document.getElementById('tryreg-table-heading');
 
   const regs = _allTryoutRegs.filter(r => {
-    // New records: match by date + time + location (composite key)
-    if (r.tryout_time || r.tryout_location) {
-      return r.tryout_date === date && r.tryout_time === time && r.tryout_location === location;
-    }
-    // Old records: fall back to date only
-    return r.tryout_date === date;
+    // Match strictly by date + time + location (composite unique key)
+    return r.tryout_date === date && r.tryout_time === time && r.tryout_location === location;
   });
   heading.textContent = `Registrations — ${date}${location ? ' @ ' + location : ''} (${regs.length})`;
   tableWrap.style.display = 'block';
