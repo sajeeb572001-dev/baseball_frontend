@@ -1934,7 +1934,7 @@ function showTryregForTryout(date, location) {
           (r.payment_date ? '<div style="font-size:.68rem;color:var(--sub);margin-top:2px">' + esc(r.payment_date) + '</div>' : '')
         : '<span style="background:#fef2f2;color:#c8102e;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em">Pending</span>';
     const markPaidBtn = (!isFree && !isPaid)
-      ? '<button onclick="markTryoutPaid('' + r._id + '')" style="margin-top:5px;display:block;background:var(--navy);color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:.68rem;font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer">Mark Paid</button>'
+      ? '<button onclick="markTryoutPaid(\'' + r._id + '\')" style="margin-top:5px;display:block;background:var(--navy);color:#fff;border:none;border-radius:4px;padding:3px 9px;font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer">Mark Paid</button>'
       : '';
     return '<tr>' +
       '<td style="font-weight:600;color:var(--navy)">' + esc(r.player_name||'—') + '</td>' +
@@ -2643,7 +2643,7 @@ function openPaymentDetail(paymentId) {
         '<div style="font-size:.72rem;color:var(--sub)">' + paidCount + ' of ' + plan.length + ' months paid</div>' +
       '</div>' +
       '<div style="background:var(--mid);border-radius:4px;height:5px;margin-bottom:.8rem;overflow:hidden">' +
-        '<div style="height:100%;background:#16a34a;width:' + progressPct + %;border-radius:4px;transition:width .3s"></div>' +
+        '<div style="height:100%;background:#16a34a;width:' + progressPct + '%;border-radius:4px;transition:width .3s"></div>' +
       '</div>' +
       '<div style="background:var(--light);border-radius:8px;overflow:hidden">' + planRows + '</div>';
   } else {
