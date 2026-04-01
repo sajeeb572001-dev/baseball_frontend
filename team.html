@@ -1013,7 +1013,7 @@ document.getElementById('reg-submit-btn').addEventListener('click', async functi
             })
           });
           const pmtData = await pmtRes.json();
-          savedPaymentId = pmtData.payment?.id || null;
+          savedPaymentId = pmtData.payment?._id || pmtData.payment?.id || null;
         } catch(e) { console.error('Payment record error:', e); }
       }
 
