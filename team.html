@@ -439,7 +439,7 @@ th.sort-desc .sort-icon .up   { opacity: .3; }
           Registration submitted successfully! We'll be in touch soon.
         </div>
         <button class="reg-submit-btn" id="reg-submit-btn">
-          Submit Registration
+          Complete Registration
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
         </button>
       </div>
@@ -470,7 +470,6 @@ th.sort-desc .sort-icon .up   { opacity: .3; }
       <div>
         <div class="tr-modal-title">Register for Tryout</div>
         <div class="tr-modal-sub" id="tr-modal-sub">Complete the form below to reserve your spot</div>
-        <div id="tr-fee-notice" style="display:none;margin-top:6px;background:rgba(255,255,255,.18);border-radius:5px;padding:5px 10px;font-size:.72rem;color:#fff;font-weight:600;letter-spacing:.04em"></div>
       </div>
       <button class="tr-modal-close" id="trModalClose" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -717,58 +716,8 @@ async function loadTeam() {
     renderPage(teamData.team);
     loadTryouts(teamId);
     loadRoster(teamId);
-    handleStripeReturn();
   } catch (err) {
     showError(err.message);
-  }
-}
-
-/* ── HANDLE STRIPE REDIRECT RETURN ── */
-function handleStripeReturn() {
-  const paymentStatus = params.get('payment');
-
-  if (paymentStatus === 'success') {
-    const cleanUrl = window.location.pathname + '?id=' + teamId;
-    window.history.replaceState({}, '', cleanUrl);
-
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#16a34a;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
-    banner.textContent = '✓ Deposit Payment Successful! Your spot is secured.';
-    document.body.prepend(banner);
-    setTimeout(() => banner.remove(), 6000);
-
-    // Note: DB payment record is updated by the Stripe webhook on the backend,
-    // not here — the webhook is the reliable source of truth for payment status.
-
-  } else if (paymentStatus === 'cancelled') {
-    const cleanUrl = window.location.pathname + '?id=' + teamId;
-    window.history.replaceState({}, '', cleanUrl);
-
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#c8102e;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
-    banner.textContent = 'Payment cancelled — you can try again any time.';
-    document.body.prepend(banner);
-    setTimeout(() => banner.remove(), 5000);
-  }
-
-  // ── TRYOUT PAYMENT RETURN ──
-  const tryoutPaymentStatus = params.get('tryout_payment');
-  if (tryoutPaymentStatus === 'success') {
-    const cleanUrl = window.location.pathname + '?id=' + teamId;
-    window.history.replaceState({}, '', cleanUrl);
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#16a34a;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
-    banner.textContent = '✓ Tryout Fee Paid! Your registration is confirmed.';
-    document.body.prepend(banner);
-    setTimeout(() => banner.remove(), 6000);
-  } else if (tryoutPaymentStatus === 'cancelled') {
-    const cleanUrl = window.location.pathname + '?id=' + teamId;
-    window.history.replaceState({}, '', cleanUrl);
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#c8102e;color:#fff;text-align:center;padding:14px 20px;font-family:Oswald,sans-serif;font-size:.95rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 2px 8px rgba(0,0,0,.2)';
-    banner.textContent = 'Tryout payment cancelled — your registration is saved but payment is pending.';
-    document.body.prepend(banner);
-    setTimeout(() => banner.remove(), 6000);
   }
 }
 
@@ -933,7 +882,7 @@ async function loadTryouts(id) {
           </svg>
           ${esc([t.city, t.state].filter(Boolean).join(', '))}
         </div>` : ''}
-        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}', '${esc(t.fee||'Free')}', '${esc(t.time||'')}', '${esc(t.location||'')}')">Register for Tryout</button>
+        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}')">Register for Tryout</button>
       </div>`).join('');
   } catch (err) {
     grid.innerHTML = `<div class="no-tryouts">No upcoming tryouts scheduled. Check back soon!</div>`;
@@ -1036,12 +985,12 @@ document.getElementById('reg-submit-btn').addEventListener('click', async functi
             })
           });
           const pmtData = await pmtRes.json();
-          savedPaymentId = pmtData.payment?._id || pmtData.payment?.id || null;
+          savedPaymentId = pmtData.payment?.id || null;
         } catch(e) { console.error('Payment record error:', e); }
       }
 
       // Show payment summary to player (pass paymentId so deposit click updates DB)
-      showPlayerPaymentInfo(name, totalFee, depAmt, f, paymentPlan, savedPaymentId, email);
+      showPlayerPaymentInfo(name, totalFee, depAmt, f, paymentPlan, savedPaymentId);
     } else {
       // No financials — show simple success in modal
       showRegistrationModal(name);
@@ -1082,13 +1031,11 @@ function generatePaymentPlan(amount, deadlineStr, fromDate) {
 }
 
 /* ── SHOW PLAYER PAYMENT INFO AFTER REGISTRATION ── */
-function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, paymentId, playerEmail) {
+function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, paymentId) {
   // Store on window so deposit button can access
-  window._currentPaymentId    = paymentId;
-  window._currentDepAmt       = depAmt;
-  window._currentTotalFee     = totalFee;
-  window._currentPlayerName   = playerName;
-  window._currentPlayerEmail  = playerEmail || '';
+  window._currentPaymentId  = paymentId;
+  window._currentDepAmt     = depAmt;
+  window._currentTotalFee   = totalFee;
   const fmt2 = n => '$' + (parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const successEl = document.getElementById('reg-success');
   if (!successEl) return;
@@ -1120,8 +1067,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
             <div style="font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:700;color:var(--navy)">${fmt2(depAmt)}</div>
             <div style="font-size:.75rem;color:var(--sub)">Required deposit — unlocks your payment plan</div>
           </div>
-          <button id="deposit-btn" onclick="handleDepositClick(this)" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0;transition:background .15s">
-            Pay Deposit
+          <button id="deposit-btn" onclick="handleDepositClick(this,'',window._currentPaymentId,window._currentDepAmt,window._currentTotalFee)" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0;transition:background .15s">
+            Pay Deposit (Demo)
           </button>
         </div>
       </div>
@@ -1164,8 +1111,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
             <div style="font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:700;color:var(--navy)">${fmt2(depAmt)}</div>
             <div style="font-size:.75rem;color:var(--sub)">Required to secure your spot</div>
           </div>
-          <button onclick="handleDepositClick(this)" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0">
-            Pay Deposit
+          <button onclick="handleDepositClick(this,'${fmt2(depAmt)}','${paymentId || ''}',${depAmt},${totalFee})" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0">
+            Pay Deposit (Demo)
           </button>
         </div>
       </div>
@@ -1238,42 +1185,43 @@ async function handleDepositClick(btn) {
   btn.textContent = 'Processing…';
   btn.disabled = true;
 
-  const paymentId   = window._currentPaymentId;
-  const depAmt      = window._currentDepAmt    || 0;
-  const playerName  = window._currentPlayerName  || '';
-  const playerEmail = window._currentPlayerEmail || '';
-
-  if (!paymentId || !depAmt || !teamId) {
-    console.error('Deposit click missing values — paymentId:', paymentId, 'depAmt:', depAmt, 'teamId:', teamId);
-    btn.textContent = 'Pay Deposit';
-    btn.disabled = false;
-    alert('Unable to start payment — missing registration data. Please refresh and try again.');
-    return;
-  }
+  const paymentId = window._currentPaymentId;
+  const depAmt    = window._currentDepAmt   || 0;
+  const totalFee  = window._currentTotalFee || 0;
+  const today     = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const newPaid   = depAmt;
+  const newBalance = totalFee - depAmt;
+  const newStatus  = newBalance <= 0 ? 'Paid' : 'Partial';
 
   try {
-    const res = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paymentId,
-        depositAmount: depAmt,
-        playerName,
-        playerEmail,
-        teamId,
-      })
-    });
+    if (paymentId) {
+      const res = await fetch(`${API_BASE}/api/coach/player-payments/${paymentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          depositPaid:     true,
+          depositPaidDate: today,
+          amountPaid:      newPaid,
+          balance:         newBalance,
+          status:          newStatus,
+        })
+      });
+      if (!res.ok) throw new Error('Failed to update');
+    }
+    // Update button UI
+    btn.textContent = '✓ Deposit Paid';
+    btn.style.background = '#16a34a';
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Stripe error');
-
-    // Redirect player to Stripe Checkout page
-    window.location.href = data.url;
-
-  } catch (err) {
-    btn.textContent = 'Pay Deposit';
+    // Show monthly plan section if exists
+    const planSection = document.getElementById('monthly-plan-section');
+    if (planSection) {
+      planSection.style.display = 'block';
+      planSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } catch(err) {
+    btn.textContent = 'Pay Deposit (Demo)';
     btn.disabled = false;
-    alert('Payment error: ' + err.message);
+    console.error('Deposit error:', err);
   }
 }
 
@@ -1283,23 +1231,8 @@ const trOverlay = document.getElementById('trOverlay');
 const _originalModalBody = document.getElementById('tr-modal-body').innerHTML;
 const _originalModalFoot = document.getElementById('tr-modal-foot').innerHTML;
 
-function openTryoutModal(dateLabel, tryoutFee, tryoutTime, tryoutLocation) {
-  window._currentTryoutFee      = tryoutFee      || 'Free';
-  window._currentTryoutDate     = dateLabel       || '';
-  window._currentTryoutTime     = tryoutTime      || '';
-  window._currentTryoutLocation = tryoutLocation  || '';
-  const isFree = !tryoutFee || tryoutFee === 'Free';
+function openTryoutModal(dateLabel) {
   document.getElementById('tr-modal-sub').textContent = dateLabel || 'Complete the form below to reserve your spot';
-  // Show fee notice in modal header if paid
-  const feeNotice = document.getElementById('tr-fee-notice');
-  if (feeNotice) {
-    if (!isFree) {
-      feeNotice.textContent = 'Tryout Fee: ' + tryoutFee + ' — Payment required via card after registration';
-      feeNotice.style.display = 'block';
-    } else {
-      feeNotice.style.display = 'none';
-    }
-  }
   // Fully reset body and footer back to original form
   document.getElementById('tr-modal-body').innerHTML = _originalModalBody;
   document.getElementById('tr-modal-foot').innerHTML = _originalModalFoot;
@@ -1311,47 +1244,10 @@ function openTryoutModal(dateLabel, tryoutFee, tryoutTime, tryoutLocation) {
   
   // Initialize Flatpickr on date field AFTER modal opens
   setTimeout(() => {
-    // Destroy any existing instance first to avoid duplicate calendars on re-open
-    const existing = document.getElementById('tr-dob')._flatpickr;
-    if (existing) existing.destroy();
-
     flatpickr('#tr-dob', {
       dateFormat: 'd/m/Y',
       allowInput: false,
-      disableMobile: true,
-      maxDate: 'today',
-      // Default to a reasonable birth year (13 years ago)
-      defaultDate: (() => {
-        const d = new Date();
-        d.setFullYear(d.getFullYear() - 13);
-        return d;
-      })(),
-      // Replace the plain year number-input with a <select> dropdown
-      onReady(_sel, _str, fp) {
-        const yearEl = fp.currentYearElement;
-        if (!yearEl) return;
-        const sel = document.createElement('select');
-        sel.style.cssText = 'background:transparent;border:none;color:#fff;font-size:.9rem;font-weight:700;cursor:pointer;padding:0 4px;outline:none;max-width:64px;';
-        const curYear = new Date().getFullYear();
-        for (let y = curYear; y >= 1950; y--) {
-          const o = document.createElement('option');
-          o.value = y;
-          o.textContent = y;
-          if (y === fp.currentYear) o.selected = true;
-          sel.appendChild(o);
-        }
-        sel.addEventListener('change', () => fp.changeYear(+sel.value));
-        yearEl.parentNode.replaceChild(sel, yearEl);
-      },
-      // Keep the select in sync when the user navigates months
-      onMonthChange(_sel, _str, fp) {
-        const s = fp.calendarContainer && fp.calendarContainer.querySelector('select');
-        if (s) s.value = fp.currentYear;
-      },
-      onYearChange(_sel, _str, fp) {
-        const s = fp.calendarContainer && fp.calendarContainer.querySelector('select');
-        if (s) s.value = fp.currentYear;
-      }
+      disableMobile: true
     });
   }, 50);
 }
@@ -1391,13 +1287,9 @@ async function handleTryoutSubmit() {
   const btn = document.getElementById('tr-submit-btn');
   btn.disabled = true;
   btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle"></span>';
-
-  const email      = document.getElementById('tr-email').value.trim();
-  const tryoutFee  = window._currentTryoutFee || 'Free';
-  const isFree     = tryoutFee === 'Free' || tryoutFee === '';
-
   try {
-    const res = await fetch(`${API_BASE}/api/teams/${teamId}/tryout-registrations`, {
+    const email = document.getElementById('tr-email').value.trim();
+    await fetch(`${API_BASE}/api/teams/${teamId}/tryout-registrations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1415,63 +1307,30 @@ async function handleTryoutSubmit() {
         hw:         document.getElementById('tr-hw').value.trim(),
         pos1:       document.getElementById('tr-pos1').value,
         pos2:       document.getElementById('tr-pos2').value,
-        tryoutDate:     document.getElementById('tr-modal-sub').textContent,
-        tryoutTime:     window._currentTryoutTime     || '',
-        tryoutLocation: window._currentTryoutLocation || ''
+        tryoutDate: document.getElementById('tr-modal-sub').textContent
       })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Registration failed');
-
-    if (!isFree && data.regId) {
-      // Paid tryout — redirect to Stripe
-      const feeNum = parseFloat(tryoutFee.replace(/[^0-9.]/g, '')) || data.tryoutFeeAmt || 0;
-      document.getElementById('tr-modal-body').innerHTML = `
-        <div class="tr-success">
-          Registration received for <strong>${esc(playerName)}</strong>!<br><br>
-          Redirecting to payment for <strong>${esc(tryoutFee)}</strong> tryout fee…
-          <div style="margin-top:1rem">
-            <span style="display:inline-block;width:20px;height:20px;border:2.5px solid rgba(10,22,40,.3);border-top-color:var(--navy);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle"></span>
-          </div>
-        </div>`;
-      document.getElementById('tr-modal-foot').style.display = 'none';
-
-      const stripeRes = await fetch(`${API_BASE}/api/stripe/create-tryout-checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          regId:       data.regId,
-          feeAmount:   feeNum,
-          playerName,
-          playerEmail: email,
-          teamId,
-        })
-      });
-      const stripeData = await stripeRes.json();
-      if (!stripeRes.ok) throw new Error(stripeData.message || 'Stripe error');
-      window.location.href = stripeData.url;
-
-    } else {
-      // Free tryout — show success
-      document.getElementById('tr-modal-body').innerHTML = `
-        <div class="tr-success">
-          Registration submitted!<br>
-          We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.<br>
-          A confirmation will be sent to ${esc(email || 'your email')}.
-        </div>`;
-      const foot = document.getElementById('tr-modal-foot');
-      foot.style.display = 'block';
-      foot.innerHTML = `
-        <button class="tr-submit-btn" onclick="closeTryoutModal()" style="background:var(--navy)">
-          Close
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>`;
-    }
+    document.getElementById('tr-modal-body').innerHTML = `
+      <div class="tr-success">
+        Registration submitted!<br>
+        We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.<br>
+        A confirmation will be sent to ${esc(email || 'your email')}.
+      </div>`;
   } catch (err) {
     console.error('[tryout-reg]', err);
-    btn.disabled = false;
-    btn.textContent = 'Submit';
-    alert('Error: ' + err.message);
+    document.getElementById('tr-modal-body').innerHTML = `
+      <div class="tr-success">
+        Registration submitted!<br>
+        We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.
+      </div>`;
+  } finally {
+    const foot = document.getElementById('tr-modal-foot');
+    foot.style.display = 'block';
+    foot.innerHTML = `
+      <button class="tr-submit-btn" onclick="closeTryoutModal()" style="background:var(--navy)">
+        Return
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>`;
   }
 }
 
