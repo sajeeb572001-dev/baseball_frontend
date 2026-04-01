@@ -559,11 +559,39 @@ function esc(s) {
 const params    = new URLSearchParams(window.location.search);
 const teamId    = params.get('id');
 const teamName  = params.get('name');
-const teamState = params.get('state');
+const teamState    = params.get('state');
+const paymentStatus = params.get('payment');
 
 if (teamName) {
   document.getElementById('page-title').textContent = teamName;
   document.title = `${teamName} – Ambassadors Baseball`;
+}
+
+// Handle Stripe redirect back after checkout
+if (paymentStatus === 'success') {
+  window.addEventListener('DOMContentLoaded', () => {
+    // Clean URL
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('payment');
+    window.history.replaceState({}, '', cleanUrl.toString());
+    // Show banner
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#16a34a;color:#fff;text-align:center;padding:14px 1rem;font-family:Oswald,sans-serif;font-size:1rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 2px 12px rgba(0,0,0,.2)';
+    banner.textContent = '✓ Payment Successful! Your spot is confirmed.';
+    document.body.prepend(banner);
+    setTimeout(() => banner.remove(), 6000);
+  });
+} else if (paymentStatus === 'cancelled') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('payment');
+    window.history.replaceState({}, '', cleanUrl.toString());
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc2626;color:#fff;text-align:center;padding:14px 1rem;font-family:Oswald,sans-serif;font-size:1rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 2px 12px rgba(0,0,0,.2)';
+    banner.textContent = 'Payment cancelled — your registration is saved. You can complete payment any time.';
+    document.body.prepend(banner);
+    setTimeout(() => banner.remove(), 7000);
+  });
 }
 
 const avatarSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
@@ -1067,8 +1095,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
             <div style="font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:700;color:var(--navy)">${fmt2(depAmt)}</div>
             <div style="font-size:.75rem;color:var(--sub)">Required deposit — unlocks your payment plan</div>
           </div>
-          <button id="deposit-btn" onclick="handleDepositClick(this,'',window._currentPaymentId,window._currentDepAmt,window._currentTotalFee)" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0;transition:background .15s">
-            Pay Deposit (Demo)
+          <button id="deposit-btn" onclick="handleCheckout(this,'deposit')" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0;transition:background .15s">
+            Pay Deposit
           </button>
         </div>
       </div>
@@ -1090,8 +1118,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
             <span>Total (including deposit)</span><span>${fmt2(totalFee)}</span>
           </div>
         </div>
-        <button onclick="this.textContent='Plan Accepted';this.style.background='#16a34a';this.disabled=true" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s">
-          Accept Payment Plan
+        <button onclick="handleCheckout(this,'installment')" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s">
+          Accept Payment Plan &amp; Pay Now
         </button>
       </div>`;
   }
@@ -1111,8 +1139,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
             <div style="font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:700;color:var(--navy)">${fmt2(depAmt)}</div>
             <div style="font-size:.75rem;color:var(--sub)">Required to secure your spot</div>
           </div>
-          <button onclick="handleDepositClick(this,'${fmt2(depAmt)}','${paymentId || ''}',${depAmt},${totalFee})" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0">
-            Pay Deposit (Demo)
+          <button onclick="handleCheckout(this,'deposit')" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:11px 22px;font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;flex-shrink:0">
+            Pay Deposit
           </button>
         </div>
       </div>
@@ -1129,8 +1157,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
           <span style="color:var(--red)">${fmt2(remaining)}</span>
         </div>
       </div>
-      <button onclick="document.getElementById('reg-success').innerHTML='<div style=text-align:center;padding:1.5rem;color:#16a34a;font-weight:600>Accepted! We will be in touch soon.</div>'" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">
-        Accept
+      <button onclick="handleCheckout(this,'remainder')" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">
+        Pay Remaining Balance
       </button>`;
   }
 
@@ -1153,8 +1181,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
           <span>Total</span><span>${fmt2(totalFee)}</span>
         </div>
       </div>
-      <button onclick="document.getElementById('reg-success').innerHTML='<div style=text-align:center;padding:1.5rem;color:#16a34a;font-weight:600>Plan Accepted! We will be in touch soon.</div>'" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">
-        Accept Payment Plan
+      <button onclick="handleCheckout(this,'installment')" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">
+        Accept Payment Plan &amp; Pay Now
       </button>`;
   }
 
@@ -1170,8 +1198,8 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
           <div style="font-size:.78rem;color:var(--sub);margin-top:.3rem">Due in full by ${esc(fin.payment_deadline||'the deadline')}</div>
         </div>
         <div style="margin-top:1.2rem">
-          <button onclick="this.textContent='Accepted';this.style.background='#16a34a';this.disabled=true" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:12px 32px;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">
-            Accept
+          <button onclick="handleCheckout(this,'full')" style="background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:12px 32px;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">
+            Pay in Full
           </button>
         </div>
       </div>`;
@@ -1181,48 +1209,49 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
   showRegistrationModal(playerName, html);
 }
 
-async function handleDepositClick(btn) {
-  btn.textContent = 'Processing…';
+async function handleCheckout(btn, paymentType) {
+  btn.textContent = 'Redirecting to payment…';
   btn.disabled = true;
 
   const paymentId = window._currentPaymentId;
-  const depAmt    = window._currentDepAmt   || 0;
-  const totalFee  = window._currentTotalFee || 0;
-  const today     = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-  const newPaid   = depAmt;
-  const newBalance = totalFee - depAmt;
-  const newStatus  = newBalance <= 0 ? 'Paid' : 'Partial';
+  if (!paymentId || !teamId) {
+    alert('Payment information missing. Please try registering again.');
+    btn.disabled = false;
+    btn.textContent = paymentType === 'deposit' ? 'Pay Deposit' : paymentType === 'installment' ? 'Accept Payment Plan' : 'Pay in Full';
+    return;
+  }
 
   try {
-    if (paymentId) {
-      const res = await fetch(`${API_BASE}/api/coach/player-payments/${paymentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          depositPaid:     true,
-          depositPaidDate: today,
-          amountPaid:      newPaid,
-          balance:         newBalance,
-          status:          newStatus,
-        })
-      });
-      if (!res.ok) throw new Error('Failed to update');
-    }
-    // Update button UI
-    btn.textContent = '✓ Deposit Paid';
-    btn.style.background = '#16a34a';
+    const successUrl = `${window.location.origin}${window.location.pathname}?id=${teamId}&payment=success`;
+    const cancelUrl  = `${window.location.origin}${window.location.pathname}?id=${teamId}&payment=cancelled`;
 
-    // Show monthly plan section if exists
-    const planSection = document.getElementById('monthly-plan-section');
-    if (planSection) {
-      planSection.style.display = 'block';
-      planSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const res = await fetch(`${API_BASE}/api/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        coachId:        teamId,
+        paymentType,
+        playerPaymentId: paymentId,
+        successUrl,
+        cancelUrl,
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Checkout failed');
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error('No checkout URL returned from server');
     }
   } catch(err) {
-    btn.textContent = 'Pay Deposit (Demo)';
+    alert('Payment error: ' + err.message);
     btn.disabled = false;
-    console.error('Deposit error:', err);
+    btn.textContent = paymentType === 'deposit' ? 'Pay Deposit' : paymentType === 'installment' ? 'Accept Payment Plan' : 'Pay in Full';
   }
+}
+
+async function handleDepositClick(btn) {
+  await handleCheckout(btn, 'deposit');
 }
 
 /* ── TRYOUT MODAL ── */
