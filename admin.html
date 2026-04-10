@@ -117,7 +117,9 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--light); color
 }
 .tbl-btn-view   { color: var(--navy); border-color: var(--navy); background: transparent; }
 .tbl-btn-view:hover { background: var(--navy); color: var(--white); }
-.tbl-btn-activate { color: var(--green); border-color: var(--green); background: transparent; }
+.tbl-btn-dashboard { color: #7c3aed; border-color: #7c3aed; background: transparent; }
+.tbl-btn-dashboard:hover { background: #7c3aed; color: var(--white); }
+
 .tbl-btn-activate:hover { background: var(--green); color: var(--white); }
 .tbl-btn-deactivate { color: var(--red); border-color: var(--red); background: transparent; }
 .tbl-btn-deactivate:hover { background: var(--red); color: var(--white); }
@@ -411,6 +413,7 @@ function renderCoaches(coaches) {
       <td><span style="display:inline-flex;align-items:center;gap:4px;">${c.registrationCount > 0 ? `<span class="reg-badge">${c.registrationCount}</span>` : '—'}</span></td>
       <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="tbl-btn tbl-btn-view" onclick="openCoach('${c.id}')">View</button>
+        <button class="tbl-btn tbl-btn-dashboard" onclick="accessDashboard('${c.id}')">Access Dashboard</button>
         ${toggleBtn}
       </div></td>
     </tr>`;
@@ -564,6 +567,7 @@ function renderModal({ coach, tryouts, registrations, roster, schedule }) {
     <div class="modal-tabs">
       <button class="modal-tab active" onclick="switchModalTab(this,'mtab-overview')">Overview</button>
       <button class="modal-tab" onclick="switchModalTab(this,'mtab-edit')">Edit Profile</button>
+      <button class="modal-tab" onclick="switchModalTab(this,'mtab-tryouts')">Tryouts (${tryouts.length})</button>
       <button class="modal-tab" onclick="switchModalTab(this,'mtab-regs')">Registrations (${registrations.length})</button>
       <button class="modal-tab" onclick="switchModalTab(this,'mtab-roster')">Roster (${roster.length})</button>
       <button class="modal-tab" onclick="switchModalTab(this,'mtab-schedule')">Schedule (${schedule.length})</button>
@@ -617,6 +621,26 @@ function renderModal({ coach, tryouts, registrations, roster, schedule }) {
       </div>
       <button class="save-btn" onclick="saveCoachEdit('${coach.id}')">Save Changes</button>
       <div class="save-msg" id="edit-msg"></div>
+    </div>
+
+    <!-- TRYOUTS TAB -->
+    <div class="modal-tab-panel" id="mtab-tryouts">
+      <div style="overflow-x:auto;">${tryouts.length === 0
+        ? `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>No tryouts scheduled yet.</div>`
+        : `<table class="info-table">
+            <thead><tr><th>Date</th><th>Time</th><th>Location</th><th>City</th><th>State</th><th>Fee</th></tr></thead>
+            <tbody>${tryouts.map(t => `
+              <tr>
+                <td><strong>${esc(t.date||'—')}</strong></td>
+                <td>${esc(t.time||'—')}</td>
+                <td>${esc(t.location||'—')}</td>
+                <td>${esc(t.city||'—')}</td>
+                <td>${esc(t.state||'—')}</td>
+                <td>${esc(t.fee||'Free')}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`}
+      </div>
     </div>
 
     <!-- REGISTRATIONS TAB -->
@@ -681,6 +705,19 @@ async function saveCoachEdit(id) {
   } catch(err) {
     msg.textContent = err.message;
     msg.className = 'save-msg err';
+  }
+}
+
+// ── ACCESS DASHBOARD (admin impersonate coach) ──
+async function accessDashboard(id) {
+  try {
+    const res  = await fetch(`${API_BASE}/api/admin/coaches/${id}/token`, { headers: adminH() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to get coach token');
+    const url = `coach-dashboard.html?adminToken=${encodeURIComponent(data.token)}&adminCoachId=${encodeURIComponent(data.coachId)}`;
+    window.open(url, '_blank');
+  } catch(err) {
+    showToast(err.message, 'red');
   }
 }
 
