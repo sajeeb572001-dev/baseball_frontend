@@ -1162,15 +1162,12 @@ document.getElementById('reg-submit-btn').addEventListener('click', async functi
 
 /* ── GENERATE PAYMENT PLAN ── */
 function generatePaymentPlan(amount, deadlineStr, fromDate) {
-  // Handle "June 24, 2026" format by parsing manually if needed
+  // Handle "June 24, 2026" format
   let deadline = new Date(deadlineStr);
-  if (isNaN(deadline)) {
-    // Try parsing "Month Day, Year" format
-    deadline = new Date(Date.parse(deadlineStr));
-  }
+  if (isNaN(deadline)) deadline = new Date(Date.parse(deadlineStr));
   if (isNaN(deadline)) return [];
-  // Don't block if deadline is close — allow same month
   if (deadline < fromDate && deadline.getMonth() !== fromDate.getMonth()) return [];
+
   const months = [];
   const cur = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1);
   const end = new Date(deadline.getFullYear(), deadline.getMonth(), 1);
@@ -1179,10 +1176,29 @@ function generatePaymentPlan(amount, deadlineStr, fromDate) {
     cur.setMonth(cur.getMonth() + 1);
   }
   if (!months.length) return [];
-  const perMonth = amount / months.length;
-  return months.map(d => ({
+
+  // ── Mirror backend monthsRemainingUntilDeadline logic exactly ────────
+  // Stripe charges on the same day of month the player registered.
+  // If that day falls AFTER the deadline day in the final month,
+  // that last charge will never fire — exclude it.
+  // e.g. registered April 10, deadline June 7:
+  //   June charge fires June 10 → after June 7 deadline → excluded → 2 months
+  const chargeDay = fromDate.getDate();
+  if (chargeDay > deadline.getDate() && months.length > 1) {
+    months.pop();
+  }
+
+  if (!months.length) return [];
+  // Industry-standard first-payment adjustment:
+  // base = floor(total/months), remainder goes on month 1 exactly.
+  // e.g. $1000/3: month 1 = $333.34, months 2-3 = $333.33, total = $1000.00
+  const totalCents    = Math.round(amount * 100);
+  const baseMonthCents = Math.floor(totalCents / months.length);
+  const remainderCents = totalCents - (baseMonthCents * months.length);
+
+  return months.map((d, i) => ({
     month:  d.toLocaleDateString('en-US', { month:'long', year:'numeric' }),
-    amount: parseFloat(perMonth.toFixed(2)),
+    amount: ((i === 0 ? baseMonthCents + remainderCents : baseMonthCents) / 100),
     paid:   false,
   }));
 }
