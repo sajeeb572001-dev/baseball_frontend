@@ -97,6 +97,20 @@ input[type="number"] {
 .photo-upload-btn:hover{border-color:var(--red);color:var(--red)}
 .photo-upload-btn svg{width:14px;height:14px}
 .photo-upload-hint{font-size:.72rem;color:var(--sub);margin-top:.4rem}
+/* REGISTER TOGGLE */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;background:var(--light);border-radius:8px;border:1.5px solid var(--mid);margin-bottom:1.1rem;gap:1rem}
+.toggle-label-wrap{display:flex;flex-direction:column;gap:.22rem}
+.toggle-label-main{font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
+.toggle-label-sub{font-size:.72rem;color:var(--sub)}
+.toggle-switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:26px;transition:.3s}
+.toggle-slider::before{content:'';position:absolute;width:20px;height:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-switch input:checked+.toggle-slider{background:var(--navy)}
+.toggle-switch input:checked+.toggle-slider::before{transform:translateX(20px)}
+.toggle-status{font-family:'Oswald',sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-left:.6rem;vertical-align:middle;flex-shrink:0}
+.toggle-status.on{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.toggle-status.off{background:#fef3f5;color:var(--red);border:1px solid #f5c6cb}
 .photo-uploading{font-size:.75rem;color:var(--sub);margin-top:.4rem;display:none}
 input[type="file"].hidden-file{display:none}
 .asst-photo-wrap{display:flex;align-items:center;gap:1rem;margin-bottom:1.1rem;padding:.9rem 1rem;background:var(--light);border-radius:8px;border:1.5px solid var(--mid)}
@@ -380,7 +394,19 @@ document.addEventListener('wheel', (e) => {
 
 const API_BASE = 'https://baseball-backend-one.vercel.app';
 
-const token = localStorage.getItem('coach_token');
+// ── ADMIN IMPERSONATION (Option 3) ──
+const _params     = new URLSearchParams(window.location.search);
+const _urlToken   = _params.get('adminToken');
+const _urlCoachId = _params.get('adminCoachId');
+if (_urlToken) {
+  sessionStorage.setItem('admin_impersonation_token',    _urlToken);
+  sessionStorage.setItem('admin_impersonation_coach_id', _urlCoachId);
+  window.history.replaceState({}, '', 'coach-dashboard.html');
+}
+const isAdminView = !!sessionStorage.getItem('admin_impersonation_token');
+const token = isAdminView
+  ? sessionStorage.getItem('admin_impersonation_token')
+  : localStorage.getItem('coach_token');
 if (!token) window.location.href = 'coach-auth.html';
 
 const authH = () => ({ 'Content-Type':'application/json', 'Authorization':`Bearer ${token}` });
@@ -396,7 +422,17 @@ function setLoading(btnId,textId,loading,label){
   document.getElementById(textId).innerHTML=loading?'<span class="btn-spinner"></span>':label;
   btn.disabled=loading;
 }
-function handleLogout(){ localStorage.removeItem('coach_token'); localStorage.removeItem('coach_id'); window.location.href='coach-auth.html'; }
+function handleLogout(){
+  if (isAdminView) {
+    sessionStorage.removeItem('admin_impersonation_token');
+    sessionStorage.removeItem('admin_impersonation_coach_id');
+    window.close();
+  } else {
+    localStorage.removeItem('coach_token');
+    localStorage.removeItem('coach_id');
+    window.location.href='coach-auth.html';
+  }
+}
 let _pollInterval = null;
 let _activePanel  = 'profile';
 
@@ -611,6 +647,20 @@ function renderDashboard(coach){
           <div class="field-group">
             <label class="field-label">Team Details</label>
             <textarea class="field-textarea" id="td-details" placeholder="Add any additional team details, description, or notes here…">${esc(coach.teamDetails||'')}</textarea>
+          </div>
+          <hr class="section-divider">
+          <div class="toggle-row">
+            <div class="toggle-label-wrap">
+              <span class="toggle-label-main">Roster Registration Button</span>
+              <span class="toggle-label-sub">Enable or disable the Accept Roster Invitation button on your public team page</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span class="toggle-status ${coach.registerEnabled!==false?'on':'off'}" id="td-register-status">${coach.registerEnabled!==false?'Enabled':'Disabled'}</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="td-register-enabled" ${coach.registerEnabled!==false?'checked':''} onchange="updateRegisterStatus()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
           <button class="save-btn" id="save-td-btn" onclick="saveTeamDetails()">
             <span id="save-td-txt">Save Team Details</span>
@@ -1188,6 +1238,7 @@ async function saveTeamDetails(){
       location:    document.getElementById('td-location')?.value.trim() || '',
       ageGroup:    document.getElementById('td-agegroup').value.trim(),
       teamDetails: document.getElementById('td-details').value.trim(),
+      registerEnabled: document.getElementById('td-register-enabled').checked,
     };
     const res=await fetch(`${API_BASE}/api/coach/update-profile`,{method:'PUT',headers:authH(),body:JSON.stringify(payload)});
     const data=await res.json();
@@ -1196,6 +1247,15 @@ async function saveTeamDetails(){
     document.getElementById('dash-sub').textContent='Head Coach — '+payload.teamName;
   } catch(err){ showMsg('msg-teamdetails',err.message,'error'); }
   finally{ setLoading('save-td-btn','save-td-txt',false,'Save Team Details'); }
+}
+
+/* ── UPDATE REGISTER TOGGLE STATUS LABEL ── */
+function updateRegisterStatus(){
+  const chk=document.getElementById('td-register-enabled');
+  const lbl=document.getElementById('td-register-status');
+  if(!chk||!lbl) return;
+  if(chk.checked){ lbl.textContent='Enabled'; lbl.className='toggle-status on'; }
+  else            { lbl.textContent='Disabled'; lbl.className='toggle-status off'; }
 }
 
 /* ── SAVE ASSISTANTS ── */
