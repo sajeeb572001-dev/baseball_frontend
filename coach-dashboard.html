@@ -245,6 +245,7 @@ input[type="file"].hidden-file{display:none}
 .ar-status.paid{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
 .ar-status.partial{background:#fffbea;color:#92400e;border:1px solid #fde68a}
 .ar-status.pending{background:#fef3f5;color:var(--red);border:1px solid #f5c6cb}
+.ar-status.cancelled{background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db}
 .ar-mark-btn{display:inline-flex;align-items:center;gap:4px;background:none;border:1.5px solid var(--mid);border-radius:5px;padding:5px 10px;font-family:'Oswald',sans-serif;font-size:.62rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--navy);cursor:pointer;transition:all .15s;white-space:nowrap}
 .ar-mark-btn:hover{background:var(--navy);color:var(--white);border-color:var(--navy)}
 .ar-mark-btn svg{width:12px;height:12px}
@@ -1033,13 +1034,14 @@ function renderDashboard(coach){
                   <th>Deposit</th>
                   <th>Paid</th>
                   <th>Balance</th>
+                  <th>Installments</th>
                   <th>Deadline</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="ar-table-body">
-                <tr><td colspan="9"><div class="no-ar-state">No player payment records yet.</div></td></tr>
+                <tr><td colspan="10"><div class="no-ar-state">No player payment records yet.</div></td></tr>
               </tbody>
             </table>
           </div>
@@ -2494,12 +2496,12 @@ function renderARTable() {
   setEl('fin-stat-outstanding', fmt2(outstanding));
 
   if (!_playerPayments.length) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="no-ar-state">No player payment records yet. Players will appear here when they register.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="no-ar-state">No player payment records yet. Players will appear here when they register.</div></td></tr>';
     return;
   }
 
   tbody.innerHTML = _playerPayments.map(p => {
-    const statusClass = p.status === 'Paid' ? 'paid' : p.status === 'Partial' ? 'partial' : 'pending';
+    const statusClass = p.status === 'Paid' ? 'paid' : p.status === 'Cancelled' ? 'cancelled' : p.status === 'Partial' ? 'partial' : 'pending';
     const depHtml = p.deposit_amount > 0
       ? (p.deposit_paid
           ? `<span class="ar-status paid">Paid</span>`
@@ -2508,6 +2510,19 @@ function renderARTable() {
                Mark Paid
              </button>`)
       : '—';
+
+    // Installments progress column
+    const totalInst = parseInt(p.total_installments) || 0;
+    const paidInst  = parseInt(p.installments_paid)  || 0;
+    const instHtml  = totalInst > 0
+      ? `<div style="display:flex;align-items:center;gap:.5rem">
+           <span style="font-family:'Oswald',sans-serif;font-weight:700;color:var(--navy)">${paidInst}/${totalInst}</span>
+           <div style="flex:1;height:6px;background:var(--mid);border-radius:3px;min-width:40px">
+             <div style="width:${Math.round((paidInst/totalInst)*100)}%;height:100%;background:${paidInst>=totalInst?'#16a34a':'var(--red)'};border-radius:3px;transition:width .3s"></div>
+           </div>
+         </div>`
+      : '<span style="color:var(--sub);font-size:.76rem">—</span>';
+
     return `
       <tr>
         <td>${esc(p.player_name||'—')}</td>
@@ -2516,12 +2531,13 @@ function renderARTable() {
         <td>${depHtml}</td>
         <td>${fmt2(p.amount_paid)}</td>
         <td style="font-weight:700;color:${parseFloat(p.balance)>0?'var(--red)':'#16a34a'}">${fmt2(p.balance)}</td>
+        <td>${instHtml}</td>
         <td style="font-size:.76rem;color:var(--sub)">${esc(p.payment_deadline||'—')}</td>
         <td><span class="ar-status ${statusClass}">${esc(p.status)}</span></td>
         <td>
           <button class="ar-mark-btn" onclick="openPaymentDetail('${p._id}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            View Plan
+            View
           </button>
         </td>
       </tr>`;
@@ -2554,30 +2570,71 @@ async function markDepositPaid(paymentId) {
 function openPaymentDetail(paymentId) {
   const p = _playerPayments.find(x => x._id === paymentId);
   if (!p) return;
-  document.getElementById('pd-modal-title').textContent = (p.player_name||'Player') + ' — Payment Plan';
+  document.getElementById('pd-modal-title').textContent = (p.player_name||'Player') + ' — Payment Detail';
   const fmt2 = n => '$' + (parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const plan = p.payment_plan || [];
 
-  let planHtml = '';
-  if (plan.length) {
-    planHtml = plan.map((item, idx) => `
-      <div class="plan-detail-item ${item.paid ? 'paid-item' : ''}">
-        <span>${esc(item.month)}</span>
-        <div style="display:flex;align-items:center;gap:.6rem">
-          <span style="font-weight:700">${fmt2(item.amount)}</span>
-          <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.72rem">
-            <input type="checkbox" class="plan-detail-check" ${item.paid?'checked':''} onchange="markMonthPaid('${p._id}',${idx},this.checked)">
-            ${item.paid ? 'Paid' : 'Mark Paid'}
-          </label>
-        </div>
-      </div>`).join('');
+  const totalInst   = parseInt(p.total_installments) || 0;
+  const paidInst    = parseInt(p.installments_paid)  || 0;
+  const perMonth    = parseFloat(p.per_month_amount)  || 0;
+  const plan        = p.payment_plan || [];
+
+  // Build installment schedule rows
+  let scheduleHtml = '';
+  if (totalInst > 0 && perMonth > 0) {
+    // Calculate payment dates: registered_date + 7 days, then monthly
+    const regDate = p.registered_date ? new Date(p.registered_date) : new Date();
+    const rows = [];
+    for (let i = 0; i < totalInst; i++) {
+      const payDate = new Date(regDate);
+      payDate.setDate(payDate.getDate() + 7 + (i * 30));
+      const isPaid    = i < paidInst;
+      const isCurrent = i === paidInst;
+      const label     = payDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      rows.push(`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem .9rem;border-radius:6px;margin-bottom:.4rem;background:${isPaid?'#f0fdf4':isCurrent?'#fffbea':'var(--light)'};border:1px solid ${isPaid?'#bbf7d0':isCurrent?'#fde68a':'var(--mid)'}">
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;background:${isPaid?'#16a34a':isCurrent?'#f59e0b':'var(--mid)'};color:${isPaid||isCurrent?'#fff':'var(--sub)'}">
+              ${isPaid ? '✓' : i+1}
+            </div>
+            <div>
+              <div style="font-size:.82rem;font-weight:600;color:var(--navy)">${label}</div>
+              <div style="font-size:.7rem;color:var(--sub)">${isPaid ? 'Paid' : isCurrent ? 'Next payment' : 'Upcoming'}</div>
+            </div>
+          </div>
+          <span style="font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;color:${isPaid?'#16a34a':'var(--navy)'}">${fmt2(perMonth)}</span>
+        </div>`);
+    }
+    scheduleHtml = `
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:.6rem;margin-top:1rem">
+        Installment Schedule
+        <span style="font-weight:400;text-transform:none;letter-spacing:0;margin-left:.5rem;color:var(--navy)">${paidInst}/${totalInst} paid</span>
+      </div>
+      <div style="background:var(--mid);height:6px;border-radius:3px;margin-bottom:1rem">
+        <div style="width:${totalInst>0?Math.round((paidInst/totalInst)*100):0}%;height:100%;background:${paidInst>=totalInst?'#16a34a':'var(--red)'};border-radius:3px;transition:width .3s"></div>
+      </div>
+      ${rows.join('')}`;
+  } else if (plan.length) {
+    // Legacy manual payment plan
+    scheduleHtml = `
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:.6rem;margin-top:1rem">Monthly Payment Schedule</div>
+      <div class="plan-detail-wrap">${plan.map((item, idx) => `
+        <div class="plan-detail-item ${item.paid ? 'paid-item' : ''}">
+          <span>${esc(item.month)}</span>
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <span style="font-weight:700">${fmt2(item.amount)}</span>
+            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.72rem">
+              <input type="checkbox" class="plan-detail-check" ${item.paid?'checked':''} onchange="markMonthPaid('${p._id}',${idx},this.checked)">
+              ${item.paid ? 'Paid' : 'Mark Paid'}
+            </label>
+          </div>
+        </div>`).join('')}</div>`;
   } else {
-    planHtml = '<div style="color:var(--sub);font-size:.84rem;padding:.5rem">No monthly plan — full payment expected by deadline.</div>';
+    scheduleHtml = '<div style="color:var(--sub);font-size:.84rem;padding:.5rem;margin-top:1rem">No installment plan — full payment expected by deadline.</div>';
   }
 
   document.getElementById('pd-modal-body').innerHTML = `
     <div style="padding:.5rem 0">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.2rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
         <div style="background:var(--light);border-radius:6px;padding:.75rem 1rem">
           <div style="font-size:.62rem;color:var(--sub);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Total Fee</div>
           <div style="font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:700;color:var(--navy)">${fmt2(p.total_fee)}</div>
@@ -2596,14 +2653,13 @@ function openPaymentDetail(paymentId) {
         </div>
       </div>
       ${p.deposit_amount > 0 ? `
-        <div style="background:${p.deposit_paid?'#f0fdf4':'#fffbea'};border-radius:6px;padding:.75rem 1rem;margin-bottom:1rem;border:1px solid ${p.deposit_paid?'#bbf7d0':'#fde68a'}">
+        <div style="background:${p.deposit_paid?'#f0fdf4':'#fffbea'};border-radius:6px;padding:.75rem 1rem;margin-bottom:.5rem;border:1px solid ${p.deposit_paid?'#bbf7d0':'#fde68a'}">
           <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;color:${p.deposit_paid?'#16a34a':'#92400e'}">Deposit — ${fmt2(p.deposit_amount)}</div>
           <div style="font-size:.82rem;color:${p.deposit_paid?'#16a34a':'var(--sub)'}">
             ${p.deposit_paid ? '✓ Paid on ' + (p.deposit_paid_date||'') : 'Not yet paid'}
           </div>
         </div>` : ''}
-      <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:.6rem">Monthly Payment Schedule</div>
-      <div class="plan-detail-wrap">${planHtml}</div>
+      ${scheduleHtml}
     </div>`;
 
   document.getElementById('payment-detail-overlay').classList.add('open');
