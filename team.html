@@ -1600,14 +1600,15 @@ function showPaymentSummary(totalFee, depAmt, f, paymentPlan, playerName) {
 /* ── LOAD ROSTER ── */
 async function loadRoster(id) {
   try {
-    const res  = await fetch(`${API_BASE}/api/teams/${id}/roster`);
+    // ?paid=true → backend returns only players whose Stripe checkout completed
+    const res  = await fetch(`${API_BASE}/api/teams/${id}/roster?paid=true`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
     const players = data.players || [];
     const tbody = document.getElementById('roster-body');
     if (!tbody) return;
     if (!players.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-roster">No players have registered yet.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-roster">No players have completed registration and payment yet.</div></td></tr>`;
       return;
     }
     tbody.innerHTML = players.map(p => {
@@ -1631,7 +1632,7 @@ async function loadRoster(id) {
     }).join('');
   } catch (err) {
     const tbody = document.getElementById('roster-body');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="empty-roster">No players have registered yet.</div></td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7"><div class="empty-roster">No players have completed registration and payment yet.</div></td></tr>`;
   }
 }
 
