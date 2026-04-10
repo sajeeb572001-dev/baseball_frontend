@@ -1188,6 +1188,44 @@ function generatePaymentPlan(amount, deadlineStr, fromDate) {
 }
 
 /* ── SHOW PLAYER PAYMENT INFO AFTER REGISTRATION ── */
+// ── STRIPE CHECKOUT REDIRECT ──────────────────────────────────────────
+// Called by all payment buttons. Redirects the player to Stripe Checkout.
+async function startStripeCheckout(btn, paymentType) {
+  const paymentId = window._currentPaymentId;
+  const coachId   = teamId; // global set on page load
+
+  if (!paymentId) {
+    alert('Payment record not found. Please refresh and try again.');
+    return;
+  }
+
+  const originalText = btn.innerHTML;
+  btn.disabled  = true;
+  btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:8px"></span>Redirecting to payment…';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/checkout`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        coachId,
+        paymentType,
+        playerPaymentId: paymentId,
+        successUrl: window.location.href + '?payment=success',
+        cancelUrl:  window.location.href + '?payment=cancelled',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Checkout failed');
+    window.location.href = data.url; // redirect to Stripe hosted checkout
+  } catch (err) {
+    console.error('[stripe-checkout]', err);
+    alert('Could not start payment: ' + err.message);
+    btn.disabled  = false;
+    btn.innerHTML = originalText;
+  }
+}
+
 function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, paymentId) {
   window._currentPaymentId  = paymentId;
   window._currentDepAmt     = depAmt;
@@ -1197,9 +1235,25 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
   if (!successEl) return;
   successEl.style.display = 'block';
 
+  // ── Shared button style ───────────────────────────────────────────────────
+  const btnStyle = `width:100%;border:none;border-radius:8px;padding:14px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s;margin-bottom:.5rem`;
+
   let html = '';
 
-  // ── FLOW 1: Deposit ON + Monthly ON ──
+  // Show a success notice if the user returns from Stripe
+  const urlParams = new URLSearchParams(window.location.search);
+  const paymentStatus = urlParams.get('payment');
+  if (paymentStatus === 'success') {
+    html += `<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:8px;padding:.9rem 1.2rem;margin-bottom:1rem;text-align:center;font-size:.88rem;color:#166534;font-weight:600">
+      ✅ Payment submitted — you'll receive a confirmation shortly.
+    </div>`;
+  } else if (paymentStatus === 'cancelled') {
+    html += `<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:.9rem 1.2rem;margin-bottom:1rem;text-align:center;font-size:.88rem;color:#9a3412">
+      ⚠ Payment was cancelled. You can try again below.
+    </div>`;
+  }
+
+  // ── FLOW 1: Deposit ON + Monthly ON ──────────────────────────────────────
   if (fin.deposit_enabled && fin.monthly_payments && paymentPlan.length) {
     const remaining = totalFee - depAmt;
     const planRows  = paymentPlan.map(p => `
@@ -1207,23 +1261,25 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
         <span style="color:var(--text)">${esc(p.month)}</span>
         <span style="font-family:'Oswald',sans-serif;font-weight:700;color:var(--navy)">${fmt2(p.amount)}</span>
       </div>`).join('');
-    html = `
-      <!-- DEPOSIT SECTION -->
+    html += `
+      <!-- DEPOSIT STEP -->
       <div style="background:#fffbea;border:1.5px solid #fde68a;border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem">
         <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#92400e;margin-bottom:.8rem;text-align:center">
-          Step 1 — Deposit Required to Secure Your Spot
+          Step 1 — Pay Deposit to Secure Your Spot
         </div>
         <div style="text-align:center;padding:.4rem 0 .6rem">
           <div style="font-family:'Oswald',sans-serif;font-size:2.2rem;font-weight:700;color:var(--navy);line-height:1">${fmt2(depAmt)}</div>
-          <div style="font-size:.75rem;color:#92400e;margin-top:.4rem;font-weight:600">Deposit Due Now</div>
+          <div style="font-size:.75rem;color:#92400e;margin-top:.4rem;font-weight:600">Due Now</div>
         </div>
-        <div style="font-size:.75rem;color:#92400e;opacity:.85;text-align:center;margin-top:.4rem">⚠ Payment processing coming soon — your coach will be in touch.</div>
+        <button style="${btnStyle};background:#d97706;color:#fff;" onclick="startStripeCheckout(this,'deposit')">
+          Pay Deposit ${fmt2(depAmt)} →
+        </button>
       </div>
 
-      <!-- MONTHLY PLAN SECTION -->
+      <!-- MONTHLY PLAN STEP -->
       <div style="background:var(--light);border:1.5px solid var(--mid);border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem">
         <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);margin-bottom:.5rem;text-align:center">
-          Step 2 — Monthly Payment Plan
+          Step 2 — Set Up Monthly Payments
         </div>
         <div style="font-size:.78rem;color:var(--sub);margin-bottom:.8rem;background:var(--white);border-radius:6px;padding:.6rem .8rem;border-left:3px solid var(--red)">
           Total fee <strong style="color:var(--navy)">${fmt2(totalFee)}</strong>
@@ -1232,129 +1288,96 @@ function showPlayerPaymentInfo(playerName, totalFee, depAmt, fin, paymentPlan, p
           split over <strong style="color:var(--navy)">${paymentPlan.length} month${paymentPlan.length!==1?'s':''}</strong>
         </div>
         ${planRows}
-        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem 0;font-weight:700;font-size:.88rem;border-top:2px solid var(--navy);margin-top:.4rem">
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem .8rem;font-weight:700;font-size:.88rem;border-top:2px solid var(--navy);margin-top:.4rem;margin-bottom:.8rem">
           <span>Total (incl. deposit)</span><span>${fmt2(totalFee)}</span>
         </div>
-      </div>
-      <button onclick="this.textContent='Plan Accepted ✓';this.style.background='#16a34a';this.disabled=true" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s">
-        Accept Payment Plan
-      </button>`;
+        <button style="${btnStyle};background:var(--navy);color:var(--white);" onclick="startStripeCheckout(this,'installment')">
+          Start Monthly Plan — ${fmt2(remaining / paymentPlan.length)}/mo ×${paymentPlan.length} →
+        </button>
+        <div style="font-size:.72rem;color:var(--sub);text-align:center;margin-top:.3rem">
+          Billed monthly. Stops automatically on ${esc(fin.payment_deadline||'the deadline')} or when fully paid.
+        </div>
+      </div>`;
   }
 
-  // ── FLOW 2: Deposit ON + Monthly OFF ──
+  // ── FLOW 2: Deposit ON + Monthly OFF ─────────────────────────────────────
   else if (fin.deposit_enabled && !fin.monthly_payments) {
     const remaining = totalFee - depAmt;
-    html = `
+    html += `
       <div style="background:#fffbea;border:1.5px solid #fde68a;border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem">
-        <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#92400e;margin-bottom:.8rem;text-align:center">Step 1 — Deposit Required to Secure Your Spot</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#92400e;margin-bottom:.8rem;text-align:center">Step 1 — Pay Deposit to Secure Your Spot</div>
         <div style="text-align:center;padding:.4rem 0 .6rem">
           <div style="font-family:'Oswald',sans-serif;font-size:2.2rem;font-weight:700;color:var(--navy);line-height:1">${fmt2(depAmt)}</div>
-          <div style="font-size:.75rem;color:#92400e;margin-top:.4rem;font-weight:600">Deposit Due Now</div>
+          <div style="font-size:.75rem;color:#92400e;margin-top:.4rem;font-weight:600">Due Now</div>
         </div>
-        <div style="font-size:.75rem;color:#92400e;opacity:.85;text-align:center;margin-top:.4rem">⚠ Payment processing coming soon — your coach will be in touch.</div>
+        <button style="${btnStyle};background:#d97706;color:#fff;" onclick="startStripeCheckout(this,'deposit')">
+          Pay Deposit ${fmt2(depAmt)} →
+        </button>
       </div>
       <div style="background:var(--light);border:1.5px solid var(--mid);border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem">
-        <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:.6rem;text-align:center">Balance Due in Full</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:.6rem;text-align:center">Step 2 — Remaining Balance</div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem;margin-bottom:.35rem;padding:0 .2rem">
-          <span style="color:var(--sub)">Total Fee</span><span style="font-weight:700;color:#16a34a">${fmt2(totalFee)}</span>
+          <span style="color:var(--sub)">Total Fee</span><span style="font-weight:700;color:var(--navy)">${fmt2(totalFee)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.88rem;margin-bottom:.35rem;padding:0 .2rem">
-          <span style="color:var(--sub)">Deposit</span><span style="font-weight:700;color:#16a34a">− ${fmt2(depAmt)}</span>
+          <span style="color:var(--sub)">Deposit Paid</span><span style="font-weight:700;color:#16a34a">− ${fmt2(depAmt)}</span>
         </div>
-        <div style="border-top:2px solid var(--navy);margin-top:.3rem;padding-top:.5rem;display:flex;justify-content:space-between;font-size:1rem;font-weight:700;padding:0 .2rem;padding-top:.5rem">
+        <div style="border-top:2px solid var(--navy);margin:.3rem 0;padding-top:.6rem;display:flex;justify-content:space-between;font-size:1rem;font-weight:700;margin-bottom:.8rem">
           <span style="color:var(--navy)">Balance Due by ${esc(fin.payment_deadline||'deadline')}</span>
           <span style="color:var(--red)">${fmt2(remaining)}</span>
         </div>
-      </div>
-      <button onclick="this.textContent='Accepted ✓';this.style.background='#16a34a';this.disabled=true" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s">
-        Accept
-      </button>`;
+        <button style="${btnStyle};background:var(--navy);color:var(--white);" onclick="startStripeCheckout(this,'remainder')">
+          Pay Remaining Balance ${fmt2(remaining)} →
+        </button>
+      </div>`;
   }
 
-  // ── FLOW 3: No Deposit + Monthly ON ──
+  // ── FLOW 3: No Deposit + Monthly ON ──────────────────────────────────────
   else if (!fin.deposit_enabled && fin.monthly_payments && paymentPlan.length) {
+    const perMonth = totalFee / paymentPlan.length;
     const planRows = paymentPlan.map(p => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:.55rem .8rem;border-radius:6px;background:var(--white);margin-bottom:.4rem;font-size:.84rem">
         <span style="color:var(--text)">${esc(p.month)}</span>
         <span style="font-family:'Oswald',sans-serif;font-weight:700;color:var(--navy)">${fmt2(p.amount)}</span>
       </div>`).join('');
-    html = `
+    html += `
       <div style="background:var(--light);border:1.5px solid var(--mid);border-radius:10px;padding:1.2rem 1.4rem;margin-bottom:1rem">
         <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--navy);margin-bottom:.5rem;text-align:center">Monthly Payment Plan</div>
         <div style="text-align:center;padding:.3rem 0 .8rem">
-          <div style="font-family:'Oswald',sans-serif;font-size:2rem;font-weight:700;color:var(--navy)">${fmt2(totalFee / paymentPlan.length)}<span style="font-size:.9rem;color:var(--sub);font-weight:400"> /mo</span></div>
+          <div style="font-family:'Oswald',sans-serif;font-size:2rem;font-weight:700;color:var(--navy)">${fmt2(perMonth)}<span style="font-size:.9rem;color:var(--sub);font-weight:400"> /mo</span></div>
           <div style="font-size:.75rem;color:var(--sub);margin-top:.3rem">${fmt2(totalFee)} total over ${paymentPlan.length} month${paymentPlan.length!==1?'s':''}</div>
         </div>
         ${planRows}
-        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem 0;font-weight:700;font-size:.88rem;border-top:2px solid var(--navy);margin-top:.4rem">
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem .8rem;font-weight:700;font-size:.88rem;border-top:2px solid var(--navy);margin-top:.4rem;margin-bottom:.8rem">
           <span>Total</span><span>${fmt2(totalFee)}</span>
         </div>
-      </div>
-      <button onclick="this.textContent='Plan Accepted ✓';this.style.background='#16a34a';this.disabled=true" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s">
-        Accept Payment Plan
-      </button>`;
+        <button style="${btnStyle};background:var(--navy);color:var(--white);" onclick="startStripeCheckout(this,'installment')">
+          Start Monthly Plan — ${fmt2(perMonth)}/mo ×${paymentPlan.length} →
+        </button>
+        <div style="font-size:.72rem;color:var(--sub);text-align:center;margin-top:.3rem">
+          Billed monthly. Stops automatically on ${esc(fin.payment_deadline||'the deadline')} or when fully paid.
+        </div>
+      </div>`;
   }
 
-  // ── FLOW 4: Full Pay Only ──
+  // ── FLOW 4: Full Pay Only ─────────────────────────────────────────────────
   else {
-    html = `
+    html += `
       <div style="background:var(--light);border:1.5px solid var(--mid);border-radius:10px;padding:1.4rem;margin-bottom:1rem;text-align:center">
         <div style="font-family:'Oswald',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sub);margin-bottom:.6rem">Full Payment Required</div>
         <div style="font-family:'Oswald',sans-serif;font-size:2.2rem;font-weight:700;color:var(--navy);line-height:1">${fmt2(totalFee)}</div>
-        <div style="font-size:.78rem;color:var(--sub);margin-top:.4rem">Due in full by ${esc(fin.payment_deadline||'the deadline')}</div>
-      </div>
-      <button onclick="this.textContent='Accepted ✓';this.style.background='#16a34a';this.disabled=true" style="width:100%;background:var(--navy);color:var(--white);border:none;border-radius:8px;padding:13px 0;font-family:'Oswald',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s">
-        Accept
-      </button>`;
+        <div style="font-size:.78rem;color:var(--sub);margin-top:.4rem;margin-bottom:1rem">Due in full by ${esc(fin.payment_deadline||'the deadline')}</div>
+        <button style="${btnStyle};background:var(--navy);color:var(--white);" onclick="startStripeCheckout(this,'full')">
+          Pay ${fmt2(totalFee)} in Full →
+        </button>
+      </div>`;
   }
 
   successEl.innerHTML = html;
   successEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-async function handleDepositClick(btn) {
-  btn.textContent = 'Processing…';
-  btn.disabled = true;
 
-  const paymentId = window._currentPaymentId;
-  const depAmt    = window._currentDepAmt   || 0;
-  const totalFee  = window._currentTotalFee || 0;
-  const today     = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-  const newPaid   = depAmt;
-  const newBalance = totalFee - depAmt;
-  const newStatus  = newBalance <= 0 ? 'Paid' : 'Partial';
-
-  try {
-    if (paymentId) {
-      const res = await fetch(`${API_BASE}/api/coach/player-payments/${paymentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          depositPaid:     true,
-          depositPaidDate: today,
-          amountPaid:      newPaid,
-          balance:         newBalance,
-          status:          newStatus,
-        })
-      });
-      if (!res.ok) throw new Error('Failed to update');
-    }
-    // Update button UI
-    btn.textContent = '✓ Deposit Paid';
-    btn.style.background = '#16a34a';
-
-    // Show monthly plan section if exists
-    const planSection = document.getElementById('monthly-plan-section');
-    if (planSection) {
-      planSection.style.display = 'block';
-      planSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  } catch(err) {
-    btn.textContent = 'Pay Deposit (Demo)';
-    btn.disabled = false;
-    console.error('Deposit error:', err);
-  }
-}
 
 /* ── TRYOUT MODAL ── */
 const trOverlay = document.getElementById('trOverlay');
