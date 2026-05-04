@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ambassadors Baseball — Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --navy:   #0d1f38;
@@ -123,6 +123,8 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--light); color
 .tbl-btn-activate:hover { background: var(--green); color: var(--white); }
 .tbl-btn-deactivate { color: var(--red); border-color: var(--red); background: transparent; }
 .tbl-btn-deactivate:hover { background: var(--red); color: var(--white); }
+.tbl-btn-delete { color: #7f1d1d; border-color: #7f1d1d; background: transparent; }
+.tbl-btn-delete:hover { background: #7f1d1d; color: var(--white); }
 
 /* ── MODAL OVERLAY ── */
 .modal-overlay {
@@ -230,9 +232,25 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--light); color
   .edit-grid { grid-template-columns: 1fr; }
   .content { padding: 16px; }
 }
+
 </style>
 </head>
 <body>
+<div id="navbar-root"></div>
+<script>
+  fetch('navbar.html')
+    .then(r => r.text())
+    .then(html => {
+      const root = document.getElementById('navbar-root');
+      root.innerHTML = html;
+      // innerHTML doesn't execute scripts — re-run them manually
+      root.querySelectorAll('script').forEach(function(oldScript) {
+        const newScript = document.createElement('script');
+        newScript.textContent = oldScript.textContent;
+        document.head.appendChild(newScript);
+      });
+    });
+</script>
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -322,7 +340,7 @@ body { font-family: 'Source Sans 3', sans-serif; background: var(--light); color
 
 <script>
 'use strict';
-const API_BASE = 'https://baseball-backend-one.vercel.app'; // ✅ Updated to new MongoDB backend
+const API_BASE = 'https://backend-production-6cef.up.railway.app';
 let adminToken = localStorage.getItem('admin_token') || '';
 let allCoaches = [];
 let currentCoachId = null;
@@ -415,6 +433,7 @@ function renderCoaches(coaches) {
         <button class="tbl-btn tbl-btn-view" onclick="openCoach('${c.id}')">View</button>
         <button class="tbl-btn tbl-btn-dashboard" onclick="accessDashboard('${c.id}')">Access Dashboard</button>
         ${toggleBtn}
+        <button class="tbl-btn tbl-btn-delete" onclick="deleteCoach('${c.id}')">Delete</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -716,6 +735,32 @@ async function accessDashboard(id) {
     if (!res.ok) throw new Error(data.message || 'Failed to get coach token');
     const url = `coach-dashboard.html?adminToken=${encodeURIComponent(data.token)}&adminCoachId=${encodeURIComponent(data.coachId)}`;
     window.open(url, '_blank');
+  } catch(err) {
+    showToast(err.message, 'red');
+  }
+}
+
+// ── DELETE COACH ──
+async function deleteCoach(id) {
+  const coach = allCoaches.find(c => c.id === id);
+  if (!coach) return;
+  const fullName = `${coach.firstName} ${coach.lastName}`;
+  const input = prompt(`This will permanently delete the coach account.\n\nType the coach's full name to confirm:\n"${fullName}"`);
+  if (input === null) return; // cancelled
+  if (input.trim() !== fullName.trim()) {
+    showToast('Name did not match — coach not deleted', 'red');
+    return;
+  }
+  try {
+    const res  = await fetch(`${API_BASE}/api/admin/coaches/${id}`, {
+      method: 'DELETE', headers: adminH()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
+    allCoaches = allCoaches.filter(c => c.id !== id);
+    renderStats();
+    renderCoaches(allCoaches);
+    showToast('Coach deleted', 'red');
   } catch(err) {
     showToast(err.message, 'red');
   }
