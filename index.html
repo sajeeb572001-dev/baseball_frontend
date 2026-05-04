@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ambassadors Baseball – Find Teams</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --navy:#0a1628; --navy2:#0d1f3c; --red:#c8102e; --red2:#a50d25;
@@ -79,9 +79,25 @@ body{font-family:'Open Sans',sans-serif;background:var(--light);color:var(--text
   .results-header{padding:12px 16px;flex-wrap:wrap}
   .teams-grid{padding:1rem}
 }
+
 </style>
 </head>
 <body>
+<div id="navbar-root"></div>
+<script>
+  fetch('navbar.html')
+    .then(r => r.text())
+    .then(html => {
+      const root = document.getElementById('navbar-root');
+      root.innerHTML = html;
+      // innerHTML doesn't execute scripts — re-run them manually
+      root.querySelectorAll('script').forEach(function(oldScript) {
+        const newScript = document.createElement('script');
+        newScript.textContent = oldScript.textContent;
+        document.head.appendChild(newScript);
+      });
+    });
+</script>
 
 <div class="hero">
   <h1>Find <span>Ambassadors</span> Teams</h1>
@@ -126,7 +142,7 @@ body{font-family:'Open Sans',sans-serif;background:var(--light);color:var(--text
 <script>
 'use strict';
 
-const API_BASE = 'https://baseball-backend-one.vercel.app'; // ✅ Updated to new MongoDB backend
+const API_BASE = 'https://backend-production-6cef.up.railway.app';
 
 const STATE_NAMES = {
   "01":"Alabama","02":"Alaska","04":"Arizona","05":"Arkansas","06":"California",
@@ -176,10 +192,10 @@ function renderTeams(teams, titleText, metaText) {
   grid.innerHTML = '';
   teams.forEach(team => {
     const fullState = ABBR_TO_NAME[team.state] || team.state || '';
-    const params    = new URLSearchParams({ id: team._id, name: team.teamName, state: team.state || '' });
     const card      = document.createElement('a');
     card.className  = 'team-card';
-    card.href       = `team.html?${params}`;
+    // Clean URL: /Team-Name (spaces → hyphens)
+    card.href       = '/' + encodeURIComponent(team.teamName.trim().replace(/\s+/g, '-'));
     card.innerHTML  = `
       <div class="tc-name">${esc(team.teamName)}</div>
       ${team.state ? `<div class="tc-state">${esc(fullState)}</div>` : ''}`;
