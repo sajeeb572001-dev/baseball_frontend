@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Team Details – Ambassadors Baseball</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css">
 <style>
 :root {
@@ -304,9 +304,25 @@ th.sort-desc .sort-icon .up   { opacity: .3; }
   .main { padding: 1.5rem 1rem 3rem; }
   .tryout-banner { border-radius: 0; margin-top: 2rem; padding: 1.8rem 1.2rem; }
 }
+
 </style>
 </head>
 <body>
+<div id="navbar-root"></div>
+<script>
+  fetch('navbar.html')
+    .then(r => r.text())
+    .then(html => {
+      const root = document.getElementById('navbar-root');
+      root.innerHTML = html;
+      // innerHTML doesn't execute scripts — re-run them manually
+      root.querySelectorAll('script').forEach(function(oldScript) {
+        const newScript = document.createElement('script');
+        newScript.textContent = oldScript.textContent;
+        document.head.appendChild(newScript);
+      });
+    });
+</script>
 
 <div class="page-header">
   <div class="page-header-inner">
@@ -372,6 +388,9 @@ th.sort-desc .sort-icon .up   { opacity: .3; }
       </div>
     </div>
   </div>
+
+  <!-- TRYOUT PAYMENT RETURN MESSAGE -->
+  <div id="tryout-payment-msg" style="display:none;margin-bottom:1.4rem;"></div>
 
   <!-- TRYOUTS -->
   <div id="tryouts-section" style="margin-bottom:1.4rem;">
@@ -548,7 +567,7 @@ th.sort-desc .sort-icon .up   { opacity: .3; }
 <script>
 'use strict';
 
-const API_BASE = 'https://baseball-backend-one.vercel.app'; // ✅ Updated to new MongoDB backend
+const API_BASE = 'https://backend-production-6cef.up.railway.app';
 
 const ABBR_TO_NAME = {
   "AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California",
@@ -568,14 +587,37 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-const params    = new URLSearchParams(window.location.search);
-const teamId    = params.get('id');
-const teamName  = params.get('name');
-const teamState = params.get('state');
+// ── Read team slug from URL path e.g. /Red-Hawks or /red-hawks ──
+// Falls back to ?id= query param for backwards compatibility
+const _pathSlug = decodeURIComponent(window.location.pathname.replace(/^\//, '').replace(/\/$/, ''));
+const _qParams   = new URLSearchParams(window.location.search);
+const _qId       = _qParams.get('id');
 
-if (teamName) {
-  document.getElementById('page-title').textContent = teamName;
-  document.title = `${teamName} – Ambassadors Baseball`;
+// ── Tryout payment return handler ─────────────────────────────
+const _tryoutPaymentStatus = _qParams.get('tryout_payment');
+if (_tryoutPaymentStatus === 'success' || _tryoutPaymentStatus === 'cancelled') {
+  window.addEventListener('DOMContentLoaded', () => {
+    const msgDiv = document.getElementById('tryout-payment-msg');
+    if (!msgDiv) return;
+    if (_tryoutPaymentStatus === 'success') {
+      msgDiv.innerHTML = `<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:8px;padding:.9rem 1.2rem;text-align:center;font-size:.88rem;color:#166534;font-weight:600">
+        ✅ Payment successful — your tryout registration is confirmed!
+      </div>`;
+    } else {
+      msgDiv.innerHTML = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:.9rem 1.2rem;text-align:center;font-size:.88rem;color:#9a3412">
+        ⚠ Payment was cancelled. Please register again and complete payment to secure your spot.
+      </div>`;
+    }
+    msgDiv.style.display = 'block';
+    msgDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
+// teamId is resolved after the API call below; initialise as null
+let teamId = _qId || null;   // will be overwritten if we load by slug
+
+if (_pathSlug) {
+  // Page title will be updated once the team data loads from the API
 }
 
 const avatarSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
@@ -715,9 +757,74 @@ document.querySelectorAll('.schedule-table thead th').forEach(th => {
 let _teamFinancials = null;
 let _registerEnabled = true;
 
+/* ── CONTACT COACH GUARD ── */
+function showContactCoachModal() {
+  const overlay = document.createElement('div');
+  overlay.id = 'contact-coach-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:9999;padding:1rem;
+  `;
+  overlay.innerHTML = `
+    <div style="
+      background:#fff;border-radius:12px;padding:2rem 1.8rem;
+      max-width:380px;width:100%;text-align:center;
+      box-shadow:0 8px 40px rgba(0,0,0,.2);
+    ">
+      <div style="
+        width:52px;height:52px;background:#fef2f2;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        margin:0 auto 1rem;
+      ">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c8102e" stroke-width="2.2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div style="font-family:'Oswald',sans-serif;font-size:1.15rem;font-weight:700;color:#0a1628;margin-bottom:.6rem;letter-spacing:.03em;">
+        Setup Not Complete
+      </div>
+      <p style="font-size:.9rem;color:#5a6a7a;margin:0 0 1.4rem;line-height:1.5;">
+        Please contact your coach — the team payment setup hasn't been completed yet.
+      </p>
+      <button onclick="document.getElementById('contact-coach-overlay').remove()" style="
+        background:#0a1628;color:#fff;border:none;border-radius:8px;
+        padding:10px 28px;font-family:'Oswald',sans-serif;font-weight:700;
+        font-size:.9rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+      ">OK</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+function acceptInvitation(teamName) {
+  if (!_teamFinancials) {
+    showContactCoachModal();
+    return;
+  }
+  window.location.href = 'https://player-registration-nine.vercel.app' + teamName.replace(/ /g, '%20');
+}
+
 async function loadTeam() {
-  if (!teamId) { showError('Missing team information.'); return; }
   try {
+    // ── Resolve team by slug (path) or by ID (query param) ──────────────────
+    if (!teamId && _pathSlug) {
+      // Load all teams and find by slug match
+      const allRes  = await fetch(`${API_BASE}/api/teams`);
+      const allData = await allRes.json();
+      const allTeams = Array.isArray(allData) ? allData : (allData.teams || []);
+      const normalize = s => s.replace(/[-\s\/]+/g, '').toLowerCase();
+      const match = allTeams.find(t => normalize(t.teamName) === normalize(_pathSlug));
+      if (!match) { showError('Team not found.'); return; }
+      teamId = match._id;
+    }
+
+    if (!teamId) { showError('Missing team information.'); return; }
+
     const [teamRes, finRes] = await Promise.all([
       fetch(`${API_BASE}/api/teams/${teamId}`),
       fetch(`${API_BASE}/api/teams/${teamId}/financials`),
@@ -739,6 +846,10 @@ async function loadTeam() {
 /* ── RENDER PAGE ── */
 function renderPage(team) {
   const fullState = ABBR_TO_NAME[team.state] || team.state || '';
+
+  // Update page title and browser tab
+  document.getElementById('page-title').textContent = team.teamName || 'Team';
+  document.title = `${team.teamName || 'Team'} – Ambassadors Baseball`;
 
   // Head coach from coach profile, assistants from nested objects
   allCoaches = [];
@@ -811,7 +922,7 @@ function renderPage(team) {
       </div>
       <div style="padding: 16px 20px; border-top: 1px solid var(--mid, #e5e7eb); text-align: center;">
         ${_registerEnabled ? `<button
-          onclick="window.location.href='https://frontend.sajeeb.workers.dev/' + ('${team.teamName || ''}').replace(/ /g, '%20')"
+          onclick="acceptInvitation('${team.teamName || ''}')" 
           style="
             background: #1a3fc4;
             color: #fff;
@@ -922,7 +1033,7 @@ async function loadTryouts(id) {
           </svg>
           ${esc([t.city, t.state].filter(Boolean).join(', '))}
         </div>` : ''}
-        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}')">Register for Tryout</button>
+        <button class="tryout-register-btn" onclick="openTryoutModal('${esc(t.date)}', '${esc(t._id)}', '${esc(t.stripePriceId || '')}')">Register for Tryout</button>
       </div>`).join('');
   } catch (err) {
     grid.innerHTML = `<div class="no-tryouts">No upcoming tryouts scheduled. Check back soon!</div>`;
@@ -1070,6 +1181,10 @@ function renderPaymentPreview() {
 
 /* ── REGISTRATION FORM ── */
 document.getElementById('reg-submit-btn').addEventListener('click', async function () {
+  if (!_teamFinancials) {
+    showContactCoachModal();
+    return;
+  }
   const name     = document.getElementById('reg-name').value.trim();
   const jersey   = document.getElementById('reg-jersey').value.trim();
   const gradYear = document.getElementById('reg-gradyear').value.trim();
@@ -1227,8 +1342,8 @@ async function startStripeCheckout(btn, paymentType) {
         coachId,
         paymentType,
         playerPaymentId: paymentId,
-        successUrl: window.location.href + '?payment=success',
-        cancelUrl:  window.location.href + '?payment=cancelled',
+        successUrl: window.location.origin + window.location.pathname + '?payment=success',
+        cancelUrl:  window.location.origin + window.location.pathname + '?payment=cancelled',
       }),
     });
     const data = await res.json();
@@ -1401,7 +1516,14 @@ const trOverlay = document.getElementById('trOverlay');
 const _originalModalBody = document.getElementById('tr-modal-body').innerHTML;
 const _originalModalFoot = document.getElementById('tr-modal-foot').innerHTML;
 
-function openTryoutModal(dateLabel) {
+let _currentTryoutDate    = '';
+let _currentTryoutId      = '';
+let _currentTryoutPriceId = '';
+
+function openTryoutModal(dateLabel, tryoutId, stripePriceId) {
+  _currentTryoutDate    = dateLabel    || '';
+  _currentTryoutId      = tryoutId     || '';
+  _currentTryoutPriceId = stripePriceId || '';
   const inlineSection = document.getElementById('tryout-inline-section');
   const inlineHeader  = document.getElementById('tryout-inline-header');
   const inlineBody    = document.getElementById('tryout-inline-body');
@@ -1415,6 +1537,12 @@ function openTryoutModal(dateLabel) {
   // Reset the form body and footer (same content as original modal)
   inlineBody.innerHTML = _originalModalBody;
   inlineFoot.innerHTML = _originalModalFoot;
+
+  // Update button label for paid tryouts
+  const submitBtn = document.getElementById('tr-submit-btn');
+  if (submitBtn && stripePriceId) {
+    submitBtn.innerHTML = 'Continue to Pay <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px"><path d="M9 18l6-6-6-6"/></svg>';
+  }
 
   // Re-attach submit listener since innerHTML was replaced
   document.getElementById('tr-submit-btn').addEventListener('click', handleTryoutSubmit);
@@ -1474,7 +1602,7 @@ async function handleTryoutSubmit() {
   btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle"></span>';
   try {
     const email = document.getElementById('tr-email').value.trim();
-    await fetch(`${API_BASE}/api/teams/${teamId}/tryout-registrations`, {
+    const res = await fetch(`${API_BASE}/api/teams/${teamId}/tryout-registrations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1492,28 +1620,49 @@ async function handleTryoutSubmit() {
         hw:         document.getElementById('tr-hw').value.trim(),
         pos1:       document.getElementById('tr-pos1').value,
         pos2:       document.getElementById('tr-pos2').value,
-        tryoutDate: document.getElementById('tr-modal-sub').textContent
+        tryoutDate: _currentTryoutDate,
+        successUrl: `${window.location.href.split('?')[0]}?tryout_payment=success`,
+        cancelUrl:  `${window.location.href.split('?')[0]}?tryout_payment=cancelled`,
       })
     });
-    document.getElementById('tr-modal-body').innerHTML = `
-      <div class="tr-success">
-        Registration submitted!<br>
-        We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.<br>
-        A confirmation will be sent to ${esc(email || 'your email')}.
-      </div>`;
-  } catch (err) {
-    console.error('[tryout-reg]', err);
-    document.getElementById('tr-modal-body').innerHTML = `
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || 'Server error');
+    }
+    const data = await res.json();
+
+    // ── Paid tryout — redirect to Stripe checkout ─────────────
+    if (data.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return;
+    }
+
+    // ── Free tryout — show success message ────────────────────
+    // Write success to the inline section (the visible container)
+    document.getElementById('tryout-inline-body').innerHTML = `
       <div class="tr-success">
         Registration submitted!<br>
         We look forward to seeing <strong>${esc(playerName)}</strong> at the tryout.
       </div>`;
+  } catch (err) {
+    console.error('[tryout-reg]', err);
+    const btn2 = document.getElementById('tr-submit-btn');
+    if (btn2) {
+      btn2.disabled = false;
+      btn2.innerHTML = _currentTryoutPriceId
+        ? 'Continue to Pay <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>'
+        : 'Submit Registration <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>';
+    }
+    document.getElementById('tryout-inline-body').insertAdjacentHTML('afterbegin',
+      '<div style="background:#fff5f5;border:1px solid #f5c6cb;color:#c8102e;border-radius:6px;padding:.75rem 1rem;font-size:.83rem;margin-bottom:1rem">Something went wrong. Please try again.</div>'
+    );
+    return;
   } finally {
-    const foot = document.getElementById('tr-modal-foot');
+    const foot = document.getElementById('tryout-inline-foot');
     foot.style.display = 'block';
     foot.innerHTML = `
-      <button class="tr-submit-btn" onclick="closeTryoutModal()" style="background:var(--navy)">
-        Return
+      <button class="tr-submit-btn" onclick="document.getElementById('tryout-inline-section').style.display='none'" style="background:var(--navy)">
+        Close
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>`;
   }
