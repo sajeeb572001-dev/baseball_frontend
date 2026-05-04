@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/admin",            "destination": "/admin.html" },
+    { "source": "/coach-auth",       "destination": "/coach-auth.html" },
+    { "source": "/coach-dashboard",  "destination": "/coach-dashboard.html" },
+    { "source": "/reset-password",   "destination": "/reset-password.html" },
+    { "source": "/((?!.*\\.html$|.*\\.js$|.*\\.css$|.*\\.png$|.*\\.jpg$|.*\\.svg$|.*\\.ico$).*)", "destination": "/team.html" }
+  ]
+}
