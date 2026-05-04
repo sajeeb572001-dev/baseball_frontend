@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coach Portal – Ambassadors Baseball</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Open+Sans:wght@300;400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--navy:#0a1628;--red:#c8102e;--red2:#a50d25;--white:#ffffff;--light:#f4f6f9;--mid:#dce3ec;--text:#1a1a2e;--sub:#5a6a7a}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -47,9 +47,25 @@ body{font-family:'Open Sans',sans-serif;background:var(--light);color:var(--text
 .btn-spinner{width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:500px){.form-grid-2{grid-template-columns:1fr}.page-header-inner{flex-direction:column;align-items:flex-start}}
+
 </style>
 </head>
 <body>
+<div id="navbar-root"></div>
+<script>
+  fetch('navbar.html')
+    .then(r => r.text())
+    .then(html => {
+      const root = document.getElementById('navbar-root');
+      root.innerHTML = html;
+      // innerHTML doesn't execute scripts — re-run them manually
+      root.querySelectorAll('script').forEach(function(oldScript) {
+        const newScript = document.createElement('script');
+        newScript.textContent = oldScript.textContent;
+        document.head.appendChild(newScript);
+      });
+    });
+</script>
 <div class="page-header">
   <div class="page-header-inner">
     <h1>Coach Portal</h1>
@@ -184,7 +200,7 @@ body{font-family:'Open Sans',sans-serif;background:var(--light);color:var(--text
 </div>
 <script>
 'use strict';
-const API_BASE = 'https://baseball-backend-one.vercel.app'; // ✅ Updated to new MongoDB backend
+const API_BASE = 'https://backend-production-6cef.up.railway.app';
 if (localStorage.getItem('coach_token')) window.location.href = 'coach-dashboard.html';
 
 function switchTab(tab) {
