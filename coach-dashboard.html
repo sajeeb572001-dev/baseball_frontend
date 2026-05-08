@@ -409,7 +409,7 @@ document.addEventListener('wheel', (e) => {
   }
 }, { passive: true });
 
-const API_BASE = 'https://baseball-backend-one.vercel.app';
+const API_BASE = 'https://jake-pentium-flu-questions.trycloudflare.com';
 
 // ── ADMIN IMPERSONATION (Option 3) ──
 const _params     = new URLSearchParams(window.location.search);
@@ -1309,6 +1309,7 @@ async function loadTryouts(){
 }
 
 function renderTryoutsList(tryouts){
+  tryouts=[...tryouts].sort((a,b)=>{const da=new Date(a.date),db=new Date(b.date);if(!isNaN(da)&&!isNaN(db))return da-db;return String(a.date).localeCompare(String(b.date));});
   _dashTryoutsData = tryouts;
   const wrap=document.getElementById('tryouts-list-wrap'); if(!wrap) return;
   if(!tryouts.length){ wrap.innerHTML='<div class="no-tryouts-dash">No tryouts scheduled yet. Create one above!</div>'; return; }
@@ -2524,9 +2525,10 @@ function renderARTable() {
   if (!tbody) return;
 
   // Update summary stats
-  const total      = _playerPayments.length;
-  const expected   = _playerPayments.reduce((s, p) => s + (parseFloat(p.total_fee)||0), 0);
-  const collected  = _playerPayments.reduce((s, p) => s + (parseFloat(p.amount_paid)||0), 0);
+  const _paidPayments = _playerPayments.filter(p => p.status === 'Paid' || p.status === 'Partial');
+  const total      = _paidPayments.length;
+  const expected   = _paidPayments.reduce((s, p) => s + (parseFloat(p.total_fee)||0), 0);
+  const collected  = _paidPayments.reduce((s, p) => s + (parseFloat(p.amount_paid)||0), 0);
   const outstanding = expected - collected;
   const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   setEl('fin-stat-players',     total);
@@ -2539,7 +2541,7 @@ function renderARTable() {
     return;
   }
 
-  tbody.innerHTML = _playerPayments.map(p => {
+  tbody.innerHTML = _playerPayments.filter(p => p.status === 'Paid' || p.status === 'Partial').map(p => {
     const statusClass = p.status === 'Paid' ? 'paid' : p.status === 'Partial' ? 'partial' : 'pending';
     const depHtml = p.deposit_amount > 0
       ? (p.deposit_paid
